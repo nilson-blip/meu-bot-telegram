@@ -96,7 +96,9 @@ async def telegram_webhook(request: Request):
         return PlainTextResponse("OK")
 
     except Exception as e:
+        print(f"ERRO NO WEBHOOK: {type(e).__name__}: {e}")
+
         return PlainTextResponse(
-            f"Erro: {e}",
+            f"Erro: {type(e).__name__}: {e}",
             status_code=500,
         )
