@@ -71,11 +71,47 @@ async def botoes(update: Update, context):
     query = update.callback_query
     await query.answer()
 
+    if query.data == "comprar":
+        try:
+            preference_data = {
+                "items": [
+                    {
+                        "title": "VIP Teste",
+                        "quantity": 1,
+                        "unit_price": 1.00,
+                    }
+                ]
+            }
+
+            preference_response = mp.preference().create(preference_data)
+            preference = preference_response["response"]
+
+            payment_url = preference["init_point"]
+
+            await query.message.reply_text(
+                "🛒 VIP Teste\n\n"
+                "💰 Valor: R$ 1,00\n\n"
+                "👇 Clique abaixo para pagar:\n"
+                f"{payment_url}"
+            )
+
+        except Exception as e:
+            print(f"ERRO MERCADO PAGO: {type(e).__name__}: {e}")
+
+            await query.message.reply_text(
+                "❌ Não consegui gerar o pagamento agora."
+            )
+
+        return
+
     respostas = {
-        "comprar": "🛒 Área de compra\n\nProduto de teste: VIP Teste\n💰 R$ 1,00\n\nEm breve você poderá pagar aqui.",
-        "produtos": "📋 Produtos disponíveis\n\nEm breve vamos cadastrar os produtos.",
+        "produtos": "📋 Produtos disponíveis\n\nVIP Teste — R$ 1,00",
         "suporte": "❓ Suporte\n\nEm breve você poderá falar com o suporte.",
     }
+
+    await query.message.reply_text(
+        respostas.get(query.data, "Opção inválida.")
+    )
 
     await query.message.reply_text(
         respostas.get(query.data, "Opção inválida.")
