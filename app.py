@@ -71,7 +71,7 @@ async def botoes(update: Update, context):
     await query.answer()
 
     respostas = {
-        "comprar": "🛒 Área de compra\n\nEm breve você poderá comprar aqui.",
+        "comprar": "🛒 Área de compra\n\nProduto de teste: VIP Teste\n💰 R$ 1,00\n\nEm breve você poderá pagar aqui.",
         "produtos": "📋 Produtos disponíveis\n\nEm breve vamos cadastrar os produtos.",
         "suporte": "❓ Suporte\n\nEm breve você poderá falar com o suporte.",
     }
