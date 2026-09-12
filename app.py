@@ -67,26 +67,54 @@ async def start(update: Update, context):
     )
 
 
-async def botoes(update: Update, context):
+async async def botoes(update: Update, context):
     query = update.callback_query
     await query.answer()
 
     if query.data == "comprar":
         try:
-            preference_data = {
-                "items": [
-                    {
-                        "title": "VIP Teste",
-                        "quantity": 1,
-                        "unit_price": 1.00,
-                    }
-                ]
+            import requests
+            import uuid
+
+            access_token = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
+
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+                "X-Idempotency-Key": str(uuid.uuid4()),
             }
 
-            preference_response = mp.preference().create(preference_data)
-            preference = preference_response["response"]
+            order_data = {
+                "type": "online",
+                "total_amount": "1.00",
+                "external_reference": "vip_teste",
+                "processing_mode": "manual",
+                "capture_mode": "automatic_async",
+                "items": [
+                    {
+                        "external_code": "VIP-TESTE",
+                        "title": "VIP Teste",
+                        "description": "Produto de teste",
+                        "quantity": 1,
+                        "unit_price": "1.00",
+                    }
+                ],
+            }
 
-            payment_url = preference["init_point"]
+            response = requests.post(
+                "https://api.mercadopago.com/v1/orders",
+                headers=headers,
+                json=order_data,
+                timeout=20,
+            )
+
+            print("MERCADO PAGO:", response.status_code)
+            print(response.text)
+
+            response.raise_for_status()
+
+            order = response.json()
+            payment_url = order["checkout_url"]
 
             await query.message.reply_text(
                 "🛒 VIP Teste\n\n"
@@ -108,10 +136,6 @@ async def botoes(update: Update, context):
         "produtos": "📋 Produtos disponíveis\n\nVIP Teste — R$ 1,00",
         "suporte": "❓ Suporte\n\nEm breve você poderá falar com o suporte.",
     }
-
-    await query.message.reply_text(
-        respostas.get(query.data, "Opção inválida.")
-    )
 
     await query.message.reply_text(
         respostas.get(query.data, "Opção inválida.")
