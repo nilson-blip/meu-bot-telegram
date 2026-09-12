@@ -1,4 +1,4 @@
-import os
+import mercadopago
 import asyncio
 
 from fastapi import FastAPI, Request
