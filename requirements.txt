@@ -1,2 +1,3 @@
 fastapi
-python-telegram-bot
+python-telegram-bo
+mercadopago
