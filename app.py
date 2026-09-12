@@ -1,5 +1,6 @@
-import mercadopago
+import os
 import asyncio
+import mercadopago
 
 from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
