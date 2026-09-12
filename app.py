@@ -13,6 +13,13 @@ from telegram.ext import (
 
 app = FastAPI()
 
+mp_token = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
+
+if not mp_token:
+    raise RuntimeError("MERCADOPAGO_ACCESS_TOKEN não configurado.")
+
+mp = mercadopago.SDK(mp_token)
+
 telegram_app = None
 _initialized = False
 _init_lock = asyncio.Lock()
