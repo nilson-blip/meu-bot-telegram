@@ -1,3 +1,4 @@
 fastapi
 python-telegram-bot
 mercadopago
+requests
