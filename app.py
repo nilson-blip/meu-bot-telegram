@@ -14,8 +14,6 @@ from telegram.ext import (
     CallbackQueryHandler,
 )
 
-app = FastAPI()
-
 mp_token = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
 
 if not mp_token:
@@ -69,7 +67,7 @@ async def start(update: Update, context):
     )
 
 
-async async def botoes(update: Update, context):
+async def botoes(update: Update, context):
     query = update.callback_query
     await query.answer()
 
