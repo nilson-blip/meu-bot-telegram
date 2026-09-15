@@ -168,9 +168,9 @@ async def telegram_webhook(request: Request):
 
         return PlainTextResponse(
             f"Erro: {type(e).__name__}: {e}",
-            status_code=500,
-        )
-        @app.post("/mercadopago")
+            status_code=500,)
+            
+@app.post("/mercadopago")
 async def mercadopago_webhook(request: Request):
     try:
         data = await request.json()
