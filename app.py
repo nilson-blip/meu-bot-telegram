@@ -178,6 +178,8 @@ async def telegram_webhook(request: Request):
 async def mercadopago_webhook(request: Request):
     try:
         data = await request.json()
+        print("UPDATE TELEGRAM:")
+        print(data)
 
         print("WEBHOOK MERCADO PAGO:")
         print(data)
