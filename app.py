@@ -85,21 +85,25 @@ async def botoes(update: Update, context):
             }
 
             order_data = {
-                "type": "online",
-                "total_amount": "1.00",
-                "external_reference": "vip_teste",
-                "processing_mode": "manual",
-                "capture_mode": "automatic_async",
-                "items": [
-                    {
-                        "external_code": "VIP-TESTE",
-                        "title": "VIP Teste",
-                        "description": "Produto de teste",
-                        "quantity": 1,
-                        "unit_price": "1.00",
-                    }
-                ],
+    "type": "online",
+    "total_amount": "1.00",
+    "external_reference": "vip_teste",
+    "processing_mode": "automatic",
+    "transactions": {
+        "payments": [
+            {
+                "amount": "1.00",
+                "payment_method": {
+                    "id": "pix",
+                    "type": "bank_transfer"
+                }
             }
+        ]
+    },
+    "payer": {
+        "email": "nilsondeabreu.lp@gmail.com"
+    }
+}
 
             response = requests.post(
                 "https://api.mercadopago.com/v1/orders",
