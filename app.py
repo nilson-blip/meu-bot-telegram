@@ -118,7 +118,7 @@ async def botoes(update: Update, context):
             response.raise_for_status()
 
             order = response.json()
-            payment_url = order["checkout_url"]
+            payment_url = order["transactions"]["payments"][0]["payment_method"]["ticket_url"]
 
             await query.message.reply_text(
                 "🛒 VIP Teste\n\n"
