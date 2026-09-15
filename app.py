@@ -170,3 +170,71 @@ async def telegram_webhook(request: Request):
             f"Erro: {type(e).__name__}: {e}",
             status_code=500,
         )
+        @app.post("/mercadopago")
+async def mercadopago_webhook(request: Request):
+    try:
+        data = await request.json()
+
+        print("WEBHOOK MERCADO PAGO:")
+        print(data)
+
+        if data.get("type") != "order":
+            return PlainTextResponse("OK")
+
+        order_data = data.get("data", {})
+        order_id = order_data.get("id")
+
+        if not order_id:
+            return PlainTextResponse("OK")
+
+        print(f"ORDER RECEBIDA: {order_id}")
+
+        # Busca os dados completos da Order no Mercado Pago
+        access_token = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
+
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+
+        import requests
+
+        response = requests.get(
+            f"https://api.mercadopago.com/v1/orders/{order_id}",
+            headers=headers,
+            timeout=20,
+        )
+
+        print("CONSULTA ORDER:", response.status_code)
+        print(response.text)
+
+        response.raise_for_status()
+
+        order = response.json()
+
+        status = order.get("status")
+        external_reference = order.get("external_reference")
+
+        print(f"STATUS: {status}")
+        print(f"REFERÊNCIA: {external_reference}")
+
+        if status == "processed":
+            print("✅ PAGAMENTO APROVADO!")
+
+            # FUTURAMENTE:
+            # liberar acesso do comprador aqui
+
+        elif status == "failed":
+            print("❌ PAGAMENTO FALHOU")
+
+        elif status == "refunded":
+            print("↩️ PAGAMENTO ESTORNADO")
+
+        return PlainTextResponse("OK")
+
+    except Exception as e:
+        print(f"ERRO WEBHOOK MERCADO PAGO: {type(e).__name__}: {e}")
+
+        return PlainTextResponse(
+            "Erro",
+            status_code=500,
+        )
