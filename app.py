@@ -93,7 +93,7 @@ async def botoes(update: Update, context):
             order_data = {
     "type": "online",
     "total_amount": "1.00",
-    "external_reference": "vip_teste",
+    "external_reference": f"vip_{query.from_user.id}",,
     "processing_mode": "automatic",
     "transactions": {
         "payments": [
