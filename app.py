@@ -134,6 +134,17 @@ async def botoes(update: Update, context):
 
             order = response.json()
             payment_url = order["transactions"]["payments"][0]["payment_method"]["ticket_url"]
+            order_id = order["id"]
+
+supabase.table("payments").insert({
+    "order_id": order_id,
+    "telegram_user_id": query.from_user.id,
+    "amount": 1.00,
+    "status": "pending",
+    "external_reference": order["external_reference"]
+}).execute()
+
+print(f"💾 PAGAMENTO REGISTRADO NO SUPABASE: {order_id}")
 
             await query.message.reply_text(
                 "🛒 VIP Teste\n\n"
