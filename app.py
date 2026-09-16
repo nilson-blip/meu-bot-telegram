@@ -228,8 +228,7 @@ async def mercadopago_webhook(request: Request):
 
         print(f"STATUS: {status}")
         print(f"REFERÊNCIA: {external_reference}")
-
-            if status == "processed":
+        if status == "processed":
             print("✅ PAGAMENTO APROVADO!")
 
             # Recupera o ID do usuário do Telegram
