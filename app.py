@@ -1,4 +1,5 @@
 import os
+from supabase import create_client
 import asyncio
 import mercadopago
 
