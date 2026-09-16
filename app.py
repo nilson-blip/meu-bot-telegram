@@ -131,8 +131,8 @@ async def botoes(update: Update, context):
             print(response.text)
 
             response.raise_for_status()
-
-                        order = response.json()
+            
+            order = response.json()
             payment_url = order["transactions"]["payments"][0]["payment_method"]["ticket_url"]
             order_id = order["id"]
 
