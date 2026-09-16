@@ -229,45 +229,47 @@ async def mercadopago_webhook(request: Request):
         print(f"STATUS: {status}")
         print(f"REFERÊNCIA: {external_reference}")
 
-        if status == "processed":
-    print("✅ PAGAMENTO APROVADO!")
+                if status == "processed":
+            print("✅ PAGAMENTO APROVADO!")
 
-    # Recupera o ID do usuário do Telegram
-    if external_reference and external_reference.startswith("vip_"):
-        telegram_user_id = int(external_reference.replace("vip_", ""))
+            # Recupera o ID do usuário do Telegram
+            if external_reference and external_reference.startswith("vip_"):
+                telegram_user_id = int(
+                    external_reference.replace("vip_", "")
+                )
 
-        print(f"👤 USUÁRIO TELEGRAM: {telegram_user_id}")
+                print(f"👤 USUÁRIO TELEGRAM: {telegram_user_id}")
 
-        telegram = await get_telegram_app()
+                telegram = await get_telegram_app()
 
-        # ID do grupo VIP de teste
-        vip_chat_id = -1004400475106
+                # ID do grupo VIP de teste
+                vip_chat_id = -1004400475106
 
-        # Cria convite de uso único
-        invite = await telegram.bot.create_chat_invite_link(
-            chat_id=vip_chat_id,
-            member_limit=1,
-        )
+                # Cria convite de uso único
+                invite = await telegram.bot.create_chat_invite_link(
+                    chat_id=vip_chat_id,
+                    member_limit=1,
+                )
 
-        invite_link = invite.invite_link
+                invite_link = invite.invite_link
 
-        print(f"🔐 CONVITE GERADO: {invite_link}")
+                print(f"🔐 CONVITE GERADO: {invite_link}")
 
-        # Envia o convite para quem pagou
-        await telegram.bot.send_message(
-            chat_id=telegram_user_id,
-            text=(
-                "✅ Pagamento aprovado!\n\n"
-                "🎉 Seu acesso VIP está liberado!\n\n"
-                "👇 Clique abaixo para entrar no grupo:\n"
-                f"{invite_link}"
-            ),
-        )
+                # Envia o convite para quem pagou
+                await telegram.bot.send_message(
+                    chat_id=telegram_user_id,
+                    text=(
+                        "✅ Pagamento aprovado!\n\n"
+                        "🎉 Seu acesso VIP está liberado!\n\n"
+                        "👇 Clique abaixo para entrar no grupo:\n"
+                        f"{invite_link}"
+                    ),
+                )
 
-        print("🚀 ACESSO VIP ENVIADO!")
+                print("🚀 ACESSO VIP ENVIADO!")
 
-    else:
-        print("⚠️ REFERÊNCIA NÃO IDENTIFICADA")
+            else:
+                print("⚠️ REFERÊNCIA NÃO IDENTIFICADA")
 
         elif status == "failed":
             print("❌ PAGAMENTO FALHOU")
