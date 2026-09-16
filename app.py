@@ -130,8 +130,7 @@ async def botoes(update: Update, context):
             print("MERCADO PAGO:", response.status_code)
             print(response.text)
 
-            response.raise_for_status()
-            
+                        response.raise_for_status()
             order = response.json()
             payment_url = order["transactions"]["payments"][0]["payment_method"]["ticket_url"]
             order_id = order["id"]
