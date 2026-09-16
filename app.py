@@ -135,8 +135,7 @@ async def botoes(update: Update, context):
             order = response.json()
             payment_url = order["transactions"]["payments"][0]["payment_method"]["ticket_url"]
             order_id = order["id"]
-
-supabase.table("payments").insert({
+            supabase.table("payments").insert({
     "order_id": order_id,
     "telegram_user_id": query.from_user.id,
     "amount": 1.00,
