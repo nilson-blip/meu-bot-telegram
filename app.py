@@ -1,5 +1,4 @@
 import os
-from supabase import create_client
 import asyncio
 import mercadopago
 
@@ -7,14 +6,6 @@ from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
 
 app = FastAPI()
-
-supabase_url = os.getenv("SUPABASE_URL")
-supabase_key = os.getenv("SUPABASE_SECRET_KEY")
-
-if not supabase_url or not supabase_key:
-    raise RuntimeError("SUPABASE_URL ou SUPABASE_SECRET_KEY não configurado.")
-
-supabase = create_client(supabase_url, supabase_key)
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -88,6 +79,15 @@ async def botoes(update: Update, context):
 
     if query.data == "comprar":
         try:
+            from supabase import create_client
+
+            supabase_url = os.getenv("SUPABASE_URL")
+            supabase_key = os.getenv("SUPABASE_SECRET_KEY")
+
+            supabase = create_client(
+                supabase_url,
+                supabase_key
+            )
             import requests
             import uuid
 
