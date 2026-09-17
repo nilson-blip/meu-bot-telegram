@@ -58,6 +58,8 @@ async def get_telegram_app():
 
 async def start(update: Update, context):
     
+   
+    
     botoes = [
         [InlineKeyboardButton("🛒 Comprar", callback_data="comprar")],
         [InlineKeyboardButton("📋 Ver produtos", callback_data="produtos")],
