@@ -141,7 +141,8 @@ async def botoes(update: Update, context):
                 "amount": 1.00,
                 "status": "pending",
                 "external_reference": order["external_reference"],
-                 "dias_acesso": 30
+                "dias_acesso": 30,
+"data_expiracao": None
             }).execute()
 
             print(f"💾 PAGAMENTO REGISTRADO NO SUPABASE: {order_id}")
