@@ -64,7 +64,7 @@ async def start(update: Update, context):
     ]
 
     await update.message.reply_text(
-        "🤖 Olá! Bem-vindo!\n\nEscolha uma opção:",
+        "🤖 Olá! Bem-vindo!\n\nEscolha uma opção!👇",
         reply_markup=InlineKeyboardMarkup(botoes),
     )
 
