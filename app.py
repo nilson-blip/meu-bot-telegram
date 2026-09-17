@@ -7,8 +7,6 @@ from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
 
 app = FastAPI()
-application = app
-print("BOTCHE APP CARREGADO")
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
