@@ -258,6 +258,7 @@ async def mercadopago_webhook(request: Request):
                 )
 
                 print(f"👤 USUÁRIO TELEGRAM: {telegram_user_id}")
+                data_expiracao = datetime.now(timezone.utc) + timedelta(days=30)
 
                 telegram = await get_telegram_app()
 
