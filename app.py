@@ -56,12 +56,7 @@ async def get_telegram_app():
 
 
 async def start(update: Update, context):
-    print("CHAT ID:", update.effective_chat.id)
-
-    await update.message.reply_text(
-        f"🆔 ID deste chat: {update.effective_chat.id}"
-    )
-
+    
     botoes = [
         [InlineKeyboardButton("🛒 Comprar", callback_data="comprar")],
         [InlineKeyboardButton("📋 Ver produtos", callback_data="produtos")],
