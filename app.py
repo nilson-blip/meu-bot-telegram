@@ -266,7 +266,7 @@ supabase.table("payments").update({
     "external_reference",
     external_reference
 ).execute()
-                )
+                
 
                 print(f"👤 USUÁRIO TELEGRAM: {telegram_user_id}")
                 data_expiracao = datetime.now(timezone.utc) + timedelta(days=30)
