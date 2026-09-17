@@ -250,8 +250,12 @@ async def mercadopago_webhook(request: Request):
             # Recupera o ID do usuário do Telegram
             if external_reference and external_reference.startswith("vip_"):
     telegram_user_id = int(
+        if external_reference and external_reference.startswith("vip_"):
+    telegram_user_id = int(
         external_reference.replace("vip_", "")
     )
+
+    data_expiracao = datetime.now(timezone.utc) + timedelta(days=30)
 
                 data_expiracao = datetime.now(timezone.utc) + timedelta(days=30)
 
