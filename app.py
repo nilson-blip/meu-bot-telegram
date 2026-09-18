@@ -2,6 +2,7 @@ import os
 import asyncio
 from datetime import datetime, timedelta, timezone
 import mercadopago
+from supabase import create_client
 
 from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
@@ -25,7 +26,6 @@ mp = mercadopago.SDK(mp_token)
 telegram_app = None
 _initialized = False
 _init_lock = asyncio.Lock()
-from supabase import create_client
 
 
 def get_supabase():
@@ -35,7 +35,7 @@ def get_supabase():
     if not supabase_url or not supabase_key:
         raise RuntimeError("Supabase não configurado no Vercel.")
 
-    return create_client(
+     create_client(
         supabase_url,
         supabase_key
     )
