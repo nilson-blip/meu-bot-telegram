@@ -27,7 +27,6 @@ telegram_app = None
 _initialized = False
 _init_lock = asyncio.Lock()
 
-
 def get_supabase():
     supabase_url = os.getenv("SUPABASE_URL")
     supabase_key = os.getenv("SUPABASE_SECRET_KEY")
@@ -35,7 +34,7 @@ def get_supabase():
     if not supabase_url or not supabase_key:
         raise RuntimeError("Supabase não configurado no Vercel.")
 
-     create_client(
+    return create_client(
         supabase_url,
         supabase_key
     )
