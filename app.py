@@ -25,6 +25,20 @@ mp = mercadopago.SDK(mp_token)
 telegram_app = None
 _initialized = False
 _init_lock = asyncio.Lock()
+from supabase import create_client
+
+
+def get_supabase():
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_SECRET_KEY")
+
+    if not supabase_url or not supabase_key:
+        raise RuntimeError("Supabase não configurado no Vercel.")
+
+    return create_client(
+        supabase_url,
+        supabase_key
+    )
 
 
 async def get_telegram_app():
