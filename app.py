@@ -3,6 +3,8 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 import mercadopago
 from supabase import create_client
+import hashlib
+import hmac
 
 from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
