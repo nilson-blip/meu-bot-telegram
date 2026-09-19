@@ -68,7 +68,7 @@ async def verificar_remarketing():
                 agora - criado_em
             ).total_seconds() / 60
 
-            if minutos_passados < 10:
+            if minutos_passados < 5:
                 continue
 
             telegram_user_id = pagamento["telegram_user_id"]
