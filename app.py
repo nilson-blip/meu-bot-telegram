@@ -682,8 +682,11 @@ async def mercadopago_webhook(request: Request):
             pagamento_atual = pagamento.data[0]
 
             if pagamento_atual["status"] == "approved":
-                print("⚠️ PAGAMENTO JÁ PROCESSADO.")
-                return PlainTextResponse("OK")
+    if pagamento_atual.get("invite_enviado"):
+        print("⚠️ PAGAMENTO E CONVITE JÁ PROCESSADOS.")
+        return PlainTextResponse("OK")
+
+    print("🔄 PAGAMENTO APROVADO, MAS CONVITE AINDA NÃO FOI ENVIADO.")
 
             data_expiracao = (
                 datetime.now(timezone.utc)
