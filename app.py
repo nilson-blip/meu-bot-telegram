@@ -415,6 +415,26 @@ async def verificar_acessos():
 async def home():
     return PlainTextResponse("Bot online!")
 
+@app.get("/verificar-acessos")
+async def verificar_acessos_endpoint():
+    try:
+        await verificar_acessos()
+
+        return PlainTextResponse(
+            "Verificação executada."
+        )
+
+    except Exception as e:
+        print(
+            f"ERRO AO VERIFICAR ACESSOS: "
+            f"{type(e).__name__}: {e}"
+        )
+
+        return PlainTextResponse(
+            "Erro na verificação.",
+            status_code=500,
+        )
+
 
 @app.post("/telegram")
 async def telegram_webhook(request: Request):
