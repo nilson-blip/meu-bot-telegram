@@ -257,6 +257,154 @@ async def botoes(update: Update, context):
     await query.message.reply_text(
         respostas.get(query.data, "Opção inválida.")
     )
+async def verificar_acessos():
+    supabase = get_supabase()
+    agora = datetime.now(timezone.utc)
+
+    acessos = (
+        supabase.table("access_control")
+        .select("*")
+        .eq("status", "ativo")
+        .execute()
+    )
+
+    if not acessos.data:
+        print("🔎 NENHUM ACESSO ATIVO PARA VERIFICAR.")
+        return
+
+    telegram = await get_telegram_app()
+
+    vip_chat_id = -1004400475106
+
+    for acesso in acessos.data:
+        try:
+            telegram_user_id = acesso["telegram_user_id"]
+
+            expiracao = datetime.fromisoformat(
+                acesso["data_expiracao"].replace("Z", "+00:00")
+            )
+
+            segundos_restantes = (
+                expiracao - agora
+            ).total_seconds()
+
+            if (
+                0 < segundos_restantes <= 120
+                and not acesso.get("aviso_2_enviado")
+            ):
+                botoes_renovacao = [
+                    [
+                        InlineKeyboardButton(
+                            "🔄 Renovar acesso",
+                            callback_data="renovar"
+                        )
+                    ]
+                ]
+
+                await telegram.bot.send_message(
+                    chat_id=telegram_user_id,
+                    text=(
+                        "⚠️ Seu acesso VIP está quase vencendo!\n\n"
+                        "⏳ Faltam aproximadamente 2 minutos.\n\n"
+                        "Renove agora para continuar com acesso."
+                    ),
+                    reply_markup=InlineKeyboardMarkup(
+                        botoes_renovacao
+                    ),
+                )
+
+                supabase.table("access_control").update({
+                    "aviso_2_enviado": True
+                }).eq(
+                    "telegram_user_id",
+                    telegram_user_id
+                ).execute()
+
+                print(
+                    f"⚠️ AVISO 2 MIN ENVIADO: "
+                    f"{telegram_user_id}"
+                )
+
+            elif (
+                0 < segundos_restantes <= 60
+                and not acesso.get("aviso_1_enviado")
+            ):
+                botoes_renovacao = [
+                    [
+                        InlineKeyboardButton(
+                            "🔄 Renovar acesso",
+                            callback_data="renovar"
+                        )
+                    ]
+                ]
+
+                await telegram.bot.send_message(
+                    chat_id=telegram_user_id,
+                    text=(
+                        "🚨 Seu acesso VIP vence em aproximadamente 1 minuto!\n\n"
+                        "Renove agora para continuar com acesso."
+                    ),
+                    reply_markup=InlineKeyboardMarkup(
+                        botoes_renovacao
+                    ),
+                )
+
+                supabase.table("access_control").update({
+                    "aviso_1_enviado": True
+                }).eq(
+                    "telegram_user_id",
+                    telegram_user_id
+                ).execute()
+
+                print(
+                    f"🚨 AVISO 1 MIN ENVIADO: "
+                    f"{telegram_user_id}"
+                )
+
+            elif segundos_restantes <= 0:
+
+                try:
+                    await telegram.bot.ban_chat_member(
+                        chat_id=vip_chat_id,
+                        user_id=telegram_user_id,
+                    )
+
+                    await telegram.bot.unban_chat_member(
+                        chat_id=vip_chat_id,
+                        user_id=telegram_user_id,
+                        only_if_banned=True,
+                    )
+
+                    print(
+                        f"🚪 USUÁRIO REMOVIDO DO VIP: "
+                        f"{telegram_user_id}"
+                    )
+
+                except Exception as erro_remocao:
+                    print(
+                        f"⚠️ ERRO AO REMOVER "
+                        f"{telegram_user_id}: "
+                        f"{erro_remocao}"
+                    )
+
+                supabase.table("access_control").update({
+                    "status": "expirado",
+                    "atualizado_em": agora.isoformat()
+                }).eq(
+                    "telegram_user_id",
+                    telegram_user_id
+                ).execute()
+
+                print(
+                    f"⛔ ACESSO EXPIRADO: "
+                    f"{telegram_user_id}"
+                )
+
+        except Exception as erro:
+            print(
+                f"❌ ERRO AO VERIFICAR ACESSO: "
+                f"{telegram_user_id}: {erro}"
+            )
 
 
 @app.get("/")
