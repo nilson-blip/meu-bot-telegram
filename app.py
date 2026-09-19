@@ -684,7 +684,7 @@ async def mercadopago_webhook(request: Request):
 
             print("🚀 ACESSO VIP ENVIADO!")
         
-        elif status == "failed":
+elif status == "failed":
     print("❌ PAGAMENTO FALHOU")
 
     supabase.table("payments").update({
