@@ -737,7 +737,8 @@ async def mercadopago_webhook(request: Request):
                     "🎉 Seu acesso VIP está liberado!\n\n"
                     "👇 Clique abaixo para entrar no grupo:\n"
                     f"{invite_link}"            
-                    supabase.table("payments").update({
+                    
+            supabase.table("payments").update({
                 "invite_enviado": True
             }).eq(
                 "order_id",
