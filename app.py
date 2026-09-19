@@ -489,7 +489,7 @@ async def verificar_acessos():
             )
 
 
-@app.get("/")
+
 
 
 
@@ -683,13 +683,26 @@ async def mercadopago_webhook(request: Request):
             )
 
             print("🚀 ACESSO VIP ENVIADO!")
-
+        
         elif status == "failed":
-            print("❌ PAGAMENTO FALHOU")
+    print("❌ PAGAMENTO FALHOU")
 
-        elif status == "refunded":
-            print("↩️ PAGAMENTO ESTORNADO")
+    supabase.table("payments").update({
+        "status": "failed"
+    }).eq(
+        "order_id",
+        order_id
+    ).execute()
 
+elif status == "refunded":
+    print("↩️ PAGAMENTO ESTORNADO")
+
+    supabase.table("payments").update({
+        "status": "refunded"
+    }).eq(
+        "order_id",
+        order_id
+    ).execute()
     except Exception as e:
         print(f"ERRO WEBHOOK MERCADO PAGO: {type(e).__name__}: {e}")
 
