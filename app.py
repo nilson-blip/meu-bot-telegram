@@ -137,7 +137,6 @@ async def start(update: Update, context):
         reply_markup=InlineKeyboardMarkup(botoes),
     )
 
-
 async def botoes(update: Update, context):
     query = update.callback_query
     await query.answer()
