@@ -538,6 +538,9 @@ async def telegram_webhook(request: Request):
 
         data = await request.json()
 
+        x_signature = request.headers.get("x-signature")
+        x_request_id = request.headers.get("x-request-id")
+
         update = Update.de_json(
             data,
             bot=telegram.bot,
