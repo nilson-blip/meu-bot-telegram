@@ -37,7 +37,87 @@ def get_supabase():
     return create_client(
         supabase_url,
         supabase_key
+    ) 
+async def verificar_remarketing():
+    supabase = get_supabase()
+    agora = datetime.now(timezone.utc)
+
+    pagamentos = (
+        supabase.table("payments")
+        .select("*")
+        .eq("status", "pending")
+        .eq("remarketing_enviado", False)
+        .execute()
     )
+
+    if not pagamentos.data:
+        print("🔎 NENHUM PAGAMENTO PENDENTE PARA REMARKETING.")
+        return
+
+    telegram = await get_telegram_app()
+
+    for pagamento in pagamentos.data:
+        try:
+            criado_em = datetime.fromisoformat(
+                pagamento["created_at"].replace("Z", "+00:00")
+            )
+
+            minutos_passados = (
+                agora - criado_em
+            ).total_seconds() / 60
+
+            if minutos_passados < 10:
+                continue
+
+            telegram_user_id = pagamento["telegram_user_id"]
+            payment_url = pagamento.get("payment_url")
+
+            if not payment_url:
+                print(
+                    f"⚠️ PAGAMENTO SEM LINK: "
+                    f"{pagamento['id']}"
+                )
+                continue
+
+            botoes_remarketing = [
+                [
+                    InlineKeyboardButton(
+                        "💰 Finalizar pagamento",
+                        url=payment_url
+                    )
+                ]
+            ]
+
+            await telegram.bot.send_message(
+                chat_id=telegram_user_id,
+                text=(
+                    "⏳ Seu pagamento ainda não foi concluído!\n\n"
+                    "Seu acesso VIP está esperando por você.\n\n"
+                    "👇 Se ainda quiser entrar, "
+                    "finalize o pagamento abaixo:"
+                ),
+                reply_markup=InlineKeyboardMarkup(
+                    botoes_remarketing
+                ),
+            )
+
+            supabase.table("payments").update({
+                "remarketing_enviado": True
+            }).eq(
+                "id",
+                pagamento["id"]
+            ).execute()
+
+            print(
+                f"🎣 REMARKETING ENVIADO: "
+                f"{telegram_user_id}"
+            )
+
+        except Exception as erro:
+            print(
+                f"❌ ERRO NO REMARKETING: "
+                f"{pagamento.get('id')}: {erro}"
+            )
     
 async def registrar_acesso(telegram_user_id, payment_id):
     supabase = get_supabase()
