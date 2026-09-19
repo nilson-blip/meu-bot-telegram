@@ -756,6 +756,15 @@ async def mercadopago_webhook(request: Request):
             }).eq(
                 "order_id",
                 order_id
+            ).execute()         
+        elif status == "expired":
+            print("⏰ PAGAMENTO EXPIRADO")
+
+            supabase.table("payments").update({
+                "status": "expired"
+            }).eq(
+                "order_id",
+                order_id
             ).execute()
     except Exception as e:
         print(f"ERRO WEBHOOK MERCADO PAGO: {type(e).__name__}: {e}")
