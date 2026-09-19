@@ -125,14 +125,14 @@ async def get_telegram_app():
 
 
 async def start(update: Update, context):
-    
+
     botoes = [
         [InlineKeyboardButton("🛒 Comprar", callback_data="comprar")],
         [InlineKeyboardButton("📋 Ver produtos", callback_data="produtos")],
         [InlineKeyboardButton("❓ Suporte", callback_data="suporte")],
     ]
 
-        await update.message.reply_text(
+    await update.message.reply_text(
         "🤖 Olá! Bem-vindo!\n\nEscolha uma opção!👇",
         reply_markup=InlineKeyboardMarkup(botoes),
     )
@@ -170,7 +170,7 @@ async def botoes(update: Update, context):
                                 "id": "pix",
                                 "type": "bank_transfer"
                             }
-                        ]
+                        }
                     ]
                 },
                 "payer": {
@@ -257,6 +257,9 @@ async def botoes(update: Update, context):
     await query.message.reply_text(
         respostas.get(query.data, "Opção inválida.")
     )
+
+
+@app.get("/")
 
 
 
