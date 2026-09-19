@@ -558,7 +558,37 @@ async def telegram_webhook(request: Request):
                 ts = valor.strip()
 
             elif chave.strip() == "v1":
-                assinatura = valor.strip()
+                assinatura = valor.strip()         
+                data_id = request.query_params.get("data.id")
+
+        if not ts or not assinatura or not data_id:
+            return PlainTextResponse(
+                "Assinatura inválida.",
+                status_code=401,
+            )
+
+        chave_secreta = os.getenv("MERCADOPAGO_WEBHOOK_SECRET")
+
+        manifest = (
+            f"id:{data_id};"
+            f"request-id:{x_request_id};"
+            f"ts:{ts};"
+        )
+
+        assinatura_calculada = hmac.new(
+            chave_secreta.encode(),
+            manifest.encode(),
+            hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(
+            assinatura_calculada,
+            assinatura
+        ):
+            return PlainTextResponse(
+                "Assinatura inválida.",
+                status_code=401,
+            )
 
         update = Update.de_json(
             data,
