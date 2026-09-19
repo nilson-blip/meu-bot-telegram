@@ -135,24 +135,15 @@ async def start(update: Update, context):
     await update.message.reply_text(
         "🤖 Olá! Bem-vindo!\n\nEscolha uma opção!👇",
         reply_markup=InlineKeyboardMarkup(botoes),
-    )
 
-
-async def botoes(update: Update, context):
+        async def botoes(update: Update, context):
     query = update.callback_query
     await query.answer()
 
-    if query.data == "comprar":
+    if query.data in ["comprar", "renovar"]:
         try:
-            from supabase import create_client
+            supabase = get_supabase()
 
-            supabase_url = os.getenv("SUPABASE_URL")
-            supabase_key = os.getenv("SUPABASE_SECRET_KEY")
-
-            supabase = create_client(
-                supabase_url,
-                supabase_key
-            )
             import requests
             import uuid
 
@@ -165,25 +156,25 @@ async def botoes(update: Update, context):
             }
 
             order_data = {
-    "type": "online",
-    "total_amount": "1.00",
-    "external_reference": f"vip_{query.from_user.id}",
-    "processing_mode": "automatic",
-    "transactions": {
-        "payments": [
-            {
-                "amount": "1.00",
-                "payment_method": {
-                    "id": "pix",
-                    "type": "bank_transfer"
+                "type": "online",
+                "total_amount": "1.00",
+                "external_reference": f"vip_{query.from_user.id}",
+                "processing_mode": "automatic",
+                "transactions": {
+                    "payments": [
+                        {
+                            "amount": "1.00",
+                            "payment_method": {
+                                "id": "pix",
+                                "type": "bank_transfer"
+                            }
+                        }
+                    ]
+                },
+                "payer": {
+                    "email": "nilsondeabreu.lp@gmail.com"
                 }
             }
-        ]
-    },
-    "payer": {
-        "email": "nilsondeabreu.lp@gmail.com"
-    }
-}
 
             response = requests.post(
                 "https://api.mercadopago.com/v1/orders",
@@ -194,9 +185,16 @@ async def botoes(update: Update, context):
 
             print("MERCADO PAGO:", response.status_code)
             print(response.text)
+
             response.raise_for_status()
+
             order = response.json()
-            payment_url = order["transactions"]["payments"][0]["payment_method"]["ticket_url"]
+
+            payment_url = (
+                order["transactions"]["payments"][0]
+                ["payment_method"]["ticket_url"]
+            )
+
             order_id = order["id"]
 
             supabase.table("payments").insert({
@@ -206,20 +204,36 @@ async def botoes(update: Update, context):
                 "status": "pending",
                 "external_reference": order["external_reference"],
                 "dias_acesso": 30,
-"data_expiracao": None
+                "data_expiracao": None
             }).execute()
 
-            print(f"💾 PAGAMENTO REGISTRADO NO SUPABASE: {order_id}")
+            print(
+                f"💾 PAGAMENTO REGISTRADO NO SUPABASE: "
+                f"{order_id}"
+            )
+
+            if query.data == "renovar":
+                mensagem = (
+                    "🔄 Renovação de acesso\n\n"
+                    "💰 Valor: R$ 1,00\n\n"
+                    "👇 Clique abaixo para pagar:"
+                )
+            else:
+                mensagem = (
+                    "🛒 VIP Teste\n\n"
+                    "💰 Valor: R$ 1,00\n\n"
+                    "👇 Clique abaixo para pagar:"
+                )
 
             await query.message.reply_text(
-                "🛒 VIP Teste\n\n"
-                "💰 Valor: R$ 1,00\n\n"
-                "👇 Clique abaixo para pagar:\n"
-                f"{payment_url}"
+                f"{mensagem}\n\n{payment_url}"
             )
 
         except Exception as e:
-            print(f"ERRO MERCADO PAGO: {type(e).__name__}: {e}")
+            print(
+                f"ERRO MERCADO PAGO: "
+                f"{type(e).__name__}: {e}"
+            )
 
             await query.message.reply_text(
                 "❌ Não consegui gerar o pagamento agora."
@@ -228,13 +242,20 @@ async def botoes(update: Update, context):
         return
 
     respostas = {
-        "produtos": "📋 Produtos disponíveis\n\nVIP Teste — R$ 1,00",
-        "suporte": "❓ Suporte\n\nEm breve você poderá falar com o suporte.",
+        "produtos": (
+            "📋 Produtos disponíveis\n\n"
+            "VIP Teste — R$ 1,00"
+        ),
+        "suporte": (
+            "❓ Suporte\n\n"
+            "Em breve você poderá falar com o suporte."
+        ),
     }
 
     await query.message.reply_text(
         respostas.get(query.data, "Opção inválida.")
     )
+
 
 
 @app.get("/")
