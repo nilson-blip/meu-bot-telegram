@@ -539,7 +539,26 @@ async def telegram_webhook(request: Request):
         data = await request.json()
 
         x_signature = request.headers.get("x-signature")
-        x_request_id = request.headers.get("x-request-id")
+        x_request_id = request.headers.get("x-request-id")        
+        if not x_signature or not x_request_id:
+            return PlainTextResponse(
+                "Assinatura ausente.",
+                status_code=401,
+            )
+
+        partes = x_signature.split(",")
+
+        ts = None
+        assinatura = None
+
+        for parte in partes:
+            chave, valor = parte.split("=", 1)
+
+            if chave.strip() == "ts":
+                ts = valor.strip()
+
+            elif chave.strip() == "v1":
+                assinatura = valor.strip()
 
         update = Update.de_json(
             data,
