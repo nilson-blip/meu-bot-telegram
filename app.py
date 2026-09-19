@@ -507,13 +507,15 @@ async def verificar_acessos_endpoint(request: Request):
             "Não autorizado.",
             status_code=401,
         )
-
-    try:
+        
+        try:
+        await verificar_remarketing()
         await verificar_acessos()
 
         return PlainTextResponse(
             "Verificação executada."
         )
+    
 
     except Exception as e:
         print(
