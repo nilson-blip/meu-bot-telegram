@@ -416,7 +416,16 @@ async def home():
     return PlainTextResponse("Bot online!")
 
 @app.get("/verificar-acessos")
-async def verificar_acessos_endpoint():
+async def verificar_acessos_endpoint(request: Request):
+    cron_secret = os.getenv("CRON_SECRET")
+    token = request.query_params.get("token")
+
+    if not cron_secret or token != cron_secret:
+        return PlainTextResponse(
+            "Não autorizado.",
+            status_code=401,
+        )
+
     try:
         await verificar_acessos()
 
