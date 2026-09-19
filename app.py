@@ -669,7 +669,7 @@ async def mercadopago_webhook(request: Request):
 
             pagamento = (
                 supabase.table("payments")
-                .select("id, status")
+                .select("id, status, invite_enviado")
                 .eq("order_id", order_id)
                 .limit(1)
                 .execute()
