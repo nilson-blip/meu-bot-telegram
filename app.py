@@ -508,7 +508,7 @@ async def verificar_acessos_endpoint(request: Request):
             status_code=401,
         )
         
-        try:
+    try:
         await verificar_remarketing()
         await verificar_acessos()
 
