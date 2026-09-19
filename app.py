@@ -132,11 +132,13 @@ async def start(update: Update, context):
         [InlineKeyboardButton("❓ Suporte", callback_data="suporte")],
     ]
 
-    await update.message.reply_text(
+        await update.message.reply_text(
         "🤖 Olá! Bem-vindo!\n\nEscolha uma opção!👇",
         reply_markup=InlineKeyboardMarkup(botoes),
+    )
 
-        async def botoes(update: Update, context):
+
+async def botoes(update: Update, context):
     query = update.callback_query
     await query.answer()
 
@@ -168,7 +170,7 @@ async def start(update: Update, context):
                                 "id": "pix",
                                 "type": "bank_transfer"
                             }
-                        }
+                        ]
                     ]
                 },
                 "payer": {
