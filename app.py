@@ -559,7 +559,7 @@ async def telegram_webhook(request: Request):
 
             elif chave.strip() == "v1":
                 assinatura = valor.strip()         
-                data_id = request.query_params.get("data.id")
+                data_id = request.query_params.get("data.id", "").lower()
 
         if not ts or not assinatura or not data_id:
             return PlainTextResponse(
