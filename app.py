@@ -199,15 +199,17 @@ async def botoes(update: Update, context):
 
             order_id = order["id"]
 
-            supabase.table("payments").insert({
-                "order_id": order_id,
-                "telegram_user_id": query.from_user.id,
-                "amount": 1.00,
-                "status": "pending",
-                "external_reference": order["external_reference"],
-                "dias_acesso": 30,
-                "data_expiracao": None
-            }).execute()
+       supabase.table("payments").insert({
+    "order_id": order_id,
+    "telegram_user_id": query.from_user.id,
+    "amount": 1.00,
+    "status": "pending",
+    "external_reference": order["external_reference"],
+    "dias_acesso": 30,
+    "data_expiracao": None,
+    "payment_url": payment_url,
+    "remarketing_enviado": False
+}).execute()
 
             print(
                 f"💾 PAGAMENTO REGISTRADO NO SUPABASE: "
