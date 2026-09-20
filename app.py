@@ -259,33 +259,37 @@ async def start(update: Update, context):
         "🤖 Olá! Bem-vindo!\n\nEscolha uma opção!👇",
         reply_markup=InlineKeyboardMarkup(botoes),
     if query.data in ["comprar", "renovar"]:
-    try:            
-        supabase = get_supabase()
+async def botoes(update: Update, context):
+    query = update.callback_query
+    await query.answer()
 
-        produto = (
-            supabase.table("products")
-            .select("*")
-            .eq("client_id", 1)
-            .eq("status", "active")
-            .limit(1)
-            .execute()
-        )
+    if query.data in ["comprar", "renovar"]:
+        try:
+            supabase = get_supabase()
 
-        if not produto.data:
-            raise RuntimeError("Nenhum produto ativo encontrado.")
+            produto = (
+                supabase.table("products")
+                .select("*")
+                .eq("client_id", 1)
+                .eq("status", "active")
+                .limit(1)
+                .execute()
+            )
 
-        produto = produto.data[0]
+            if not produto.data:
+                raise RuntimeError("Nenhum produto ativo encontrado.")
 
-        produto_id = produto["id"]
-        preco = float(produto["price"])
-        dias_acesso = produto["duration_days"]
-        vip_group_id = produto["vip_group_id"]
+            produto = produto.data[0]
 
-        import requests
-        import uuid
+            produto_id = produto["id"]
+            preco = float(produto["price"])
+            dias_acesso = produto["duration_days"]
+            vip_group_id = produto["vip_group_id"]
 
-            access_token = 
-os.getenv("MERCADOPAGO_ACCESS_TOKEN")
+            import requests
+            import uuid
+
+            access_token = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
 
             headers = {
                 "Authorization": 
