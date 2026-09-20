@@ -611,59 +611,10 @@ async def telegram_webhook(request: Request):
 
         data = await request.json()
 
-        x_signature = request.headers.get("x-signature")
-        x_request_id = request.headers.get("x-request-id")        
-        if not x_signature or not x_request_id:
-            return PlainTextResponse(
-                "Assinatura ausente.",
-                status_code=401,
-            )
 
-        partes = x_signature.split(",")
+            
 
-        ts = None
-        assinatura = None
-
-        for parte in partes:
-            chave, valor = parte.split("=", 1)
-
-            if chave.strip() == "ts":
-                ts = valor.strip()
-
-            elif chave.strip() == "v1":
-                assinatura = valor.strip()         
-                data_id = request.query_params.get("data.id", "").lower()
-
-        if not ts or not assinatura or not data_id:
-            return PlainTextResponse(
-                "Assinatura inválida.",
-                status_code=401,
-            )
-
-        chave_secreta = os.getenv("MERCADOPAGO_WEBHOOK_SECRET")
-
-        manifest = (
-            f"id:{data_id};"
-            f"request-id:{x_request_id};"
-            f"ts:{ts};"
-        )
-
-        assinatura_calculada = hmac.new(
-            chave_secreta.encode(),
-            manifest.encode(),
-            hashlib.sha256
-        ).hexdigest()
-
-        if not hmac.compare_digest(
-            assinatura_calculada,
-            assinatura
-        ):
-            return PlainTextResponse(
-                "Assinatura inválida.",
-                status_code=401,
-            )
-
-        update = Update.de_json(
+    update = Update.de_json(
             data,
             bot=telegram.bot,
         )
