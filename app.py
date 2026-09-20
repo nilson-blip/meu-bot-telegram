@@ -305,8 +305,7 @@ str(uuid.uuid4()),
 
             order_data = {
                 "type": "online",
-                "total_amount": 
-"1.00",
+                "total_amount": f"{preco:.2f}",
                 "external_reference": 
 f"vip_{query.from_user.id}",
                 "processing_mode":
@@ -314,8 +313,7 @@ f"vip_{query.from_user.id}",
                 "transactions": {
                     "payments": [
                         {
-                            "amount": 
-"1.00",
+                            "amount": f"{preco:.2f}", 
 "payment_method": {
                                 "id": "pix",
                                 "type": "bank_transfer"
