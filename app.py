@@ -350,7 +350,7 @@ f"vip_{query.from_user.id}",
             supabase.table("payments").insert({
     "order_id": order_id,
     "telegram_user_id": query.from_user.id,
-    "amount": 1.00,
+    "amount": f"{preco:.2f}",
     "status": "pending",
     "external_reference": order["external_reference"],
     "dias_acesso": 30,
