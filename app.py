@@ -266,30 +266,27 @@ async def botoes(update: Update, context):
     await query.answer()
 
     if query.data in ["comprar", "renovar"]:
-        try:
-            supabase = get_supabase() 
+        try:            
+            supabase = get_supabase()
+
             produto = (
- supabase.table("products")
+                supabase.table("products")
                 .select("*")
                 .eq("client_id", 1)
-                .eq("status", 
-"active")
+                .eq("status", "active")
                 .limit(1)
                 .execute()
-)
+            )
+
             if not produto.data:
-                raise 
-RuntimeError("Nenhum produto ativo encontrado.") 
+                raise RuntimeError("Nenhum produto ativo encontrado.")
 
             produto = produto.data[0]
-            produto_id = 
-produto["id"]
-                         preco = 
-float(produto["price"])
-      dias_acesso = 
-produto["duration_days"] 
-      vip_group_id =
-produto["vip_group_id"]
+
+            produto_id = produto["id"]
+            preco = float(produto["price"])
+            dias_acesso = produto["duration_days"]
+            vip_group_id = produto["vip_group_id"]
 
             import requests
             import uuid
