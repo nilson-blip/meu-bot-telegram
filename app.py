@@ -539,6 +539,34 @@ async def verificar_acessos():
 @app.get("/")
 async def home():
     return PlainTextResponse("Bot online!")
+@app.get("/registrar-bot")
+async def registrar_bot_endpoint(request: Request):
+    cron_secret = os.getenv("CRON_SECRET")
+    token = request.query_params.get("token")
+
+    if not cron_secret or token != cron_secret:
+        return PlainTextResponse(
+            "Não autorizado.",
+            status_code=401,
+        )
+
+    try:
+        bot_id = await registrar_bot()
+
+        return PlainTextResponse(
+            f"Bot registrado. ID: {bot_id}"
+        )
+
+    except Exception as e:
+        print(
+            f"ERRO AO REGISTRAR BOT: "
+            f"{type(e).__name__}: {e}"
+        )
+
+        return PlainTextResponse(
+            "Erro ao registrar bot.",
+            status_code=500,
+        )
 
 @app.get("/verificar-acessos")
 async def verificar_acessos_endpoint(request: Request):
