@@ -332,6 +332,11 @@ async def botoes(update: Update, context):
     "data_expiracao": None,
     "payment_url": payment_url,
     "remarketing_enviado": False
+
+"client_id": 1,
+"product_id": 1,
+"vip_group_id": 1,
+"payment_connection_id": 1,
 }).execute()
 
             print(
