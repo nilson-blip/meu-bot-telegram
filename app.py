@@ -258,7 +258,8 @@ async def start(update: Update, context):
     await update.message.reply_text(
         "🤖 Olá! Bem-vindo!\n\nEscolha uma opção!👇",
         reply_markup=InlineKeyboardMarkup(botoes),
-    if query.data in ["comprar", "renovar"]:
+    )
+
 async def botoes(update: Update, context):
     query = update.callback_query
     await query.answer()
@@ -291,14 +292,12 @@ async def botoes(update: Update, context):
 
             access_token = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
 
-            headers = {
-                "Authorization": 
-f"Bearer {access_token}",
-                "Content-Type": 
-"application/json",
-                "X-Idempotency-Key"
-str(uuid.uuid4()),
+                        headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+                "X-Idempotency-Key": str(uuid.uuid4()),
             }
+                
 
             order_data = {
                 "type": "online",
