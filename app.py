@@ -291,7 +291,8 @@ async def botoes(update: Update, context):
             import requests
             import uuid
 
-            access_token = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
+            access_token = 
+            os.getenv("MERCADOPAGO_ACCESS_TOKEN")
             
             headers = {
                 "Authorization": f"Bearer {access_token}",
