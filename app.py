@@ -350,17 +350,17 @@ f"vip_{query.from_user.id}",
             supabase.table("payments").insert({
     "order_id": order_id,
     "telegram_user_id": query.from_user.id,
-    "amount": f"{preco:.2f}",
-    "status": "pending",
-    "external_reference": order["external_reference"],
-    "dias_acesso": 30,
-    "data_expiracao": None,
-    "payment_url": payment_url,
-    "remarketing_enviado": False,
-    "client_id": 1,
-    "product_id": 1,
-    "vip_group_id": 1,
-    "payment_connection_id": 1
+    "amount": preco,
+"status": "pending",
+"external_reference": order["external_reference"],
+"dias_acesso": dias_acesso,
+"data_expiracao": None,
+"payment_url": payment_url,
+"remarketing_enviado": False,
+"client_id": produto["client_id"],
+"product_id": produto_id,
+"vip_group_id": vip_group_id,
+"payment_connection_id": 1
 }).execute()
 
             print(
