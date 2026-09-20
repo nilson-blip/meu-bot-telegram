@@ -267,11 +267,9 @@ async def botoes(update: Update, context):
 
     if query.data in ["comprar", "renovar"]:
         try: 
-           
             supabase = get_supabase()
-
-            produto = (
-                supabase.table("products")
+            produto = (supabase)
+                .table("products")
                 .select("*")
                 .eq("client_id", 1)
                 .eq("status", "active")
