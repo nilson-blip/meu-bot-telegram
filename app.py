@@ -724,11 +724,12 @@ async def mercadopago_webhook(request: Request):
                     pagamento_atual["id"]
                 ) 
 # CRIA ASSINATURA
-    supabase.table("subscriptions").insert({
+supabase.table("subscriptions").insert({
     "client_id": 1,
     "vip_group_id": 1,
     "product_id": 1,
-"telegram_user_id": telegram_user_id,
+    "telegram_user_id": 
+telegram_user_id,
     "payment_id": 
 pagamento_atual["id"],
     "status": "active",
