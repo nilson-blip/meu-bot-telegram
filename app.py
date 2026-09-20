@@ -269,48 +269,57 @@ async def botoes(update: Update, context):
         try:
             supabase = get_supabase() 
             produto = (
-    supabase.table("products")
+ supabase.table("products")
                 .select("*")
                 .eq("client_id", 1)
-                .eq("status", "active")
+                .eq("status", 
+"active")
                 .limit(1)
                 .execute()
 )
+            if not produto.data:
+                raise 
+RuntimeError("Nenhum produto ativo encontrado.") 
 
-if not produto.data:
-    raise 
-RuntimeError("Nenhum produto ativo encontrado.")
-    produto = produto.data[0]
-    
-    produto_id = produto["id"]
-    preco = 
+            produto = produto.data[0]
+            produto_id = 
+produto["id"]
+                         preco = 
 float(produto["price"])
-    dias_acesso = 
+      dias_acesso = 
 produto["duration_days"] 
-    vip_group_id =
+      vip_group_id =
 produto["vip_group_id"]
 
             import requests
             import uuid
 
-            access_token = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
+            access_token = 
+os.getenv("MERCADOPAGO_ACCESS_TOKEN")
 
             headers = {
-                "Authorization": f"Bearer {access_token}",
-                "Content-Type": "application/json",
-                "X-Idempotency-Key": str(uuid.uuid4()),
+                "Authorization": 
+f"Bearer {access_token}",
+                "Content-Type": 
+"application/json",
+                "X-Idempotency-Key"
+str(uuid.uuid4()),
             }
 
             order_data = {
                 "type": "online",
-                "total_amount": "1.00",
-                "external_reference": f"vip_{query.from_user.id}",
-                "processing_mode": "automatic",
+                "total_amount": 
+"1.00",
+                "external_reference": 
+f"vip_{query.from_user.id}",
+                "processing_mode":
+"automatic",
                 "transactions": {
                     "payments": [
                         {
-                            "amount": "1.00",
-                            "payment_method": {
+                            "amount": 
+"1.00",
+"payment_method": {
                                 "id": "pix",
                                 "type": "bank_transfer"
                             }
