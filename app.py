@@ -38,8 +38,49 @@ def get_supabase():
 
     return create_client(
         supabase_url,
-        supabase_key
+        supabase_key 
     ) 
+
+async def registrar_bot():
+    supabase = get_supabase()
+
+    telegram = await get_telegram_app()
+
+    bot_info = await telegram.bot.get_me()
+
+    print(
+        f"🤖 BOT IDENTIFICADO: "
+        f"{bot_info.id} | @{bot_info.username}"
+    )
+
+    existente = (
+        supabase.table("telegram_bots")
+        .select("id")
+        .eq("bot_id", bot_info.id)
+        .limit(1)
+        .execute()
+    )
+
+    if existente.data:
+        print("ℹ️ BOT JÁ ESTÁ REGISTRADO.")
+        return existente.data[0]["id"]
+
+    resultado = (
+        supabase.table("telegram_bots")
+        .insert({
+            "client_id": 1,
+            "bot_id": bot_info.id,
+            "username": bot_info.username,
+            "bot_name": bot_info.first_name,
+            "bot_token": os.getenv("BOT_TOKEN"),
+            "status": "active"
+        })
+        .execute()
+    )
+
+    print("🤖 BOT REGISTRADO NO SUPABASE.")
+
+    return resultado.data[0]["id"]
 async def verificar_remarketing():
     supabase = get_supabase()
     agora = datetime.now(timezone.utc)
