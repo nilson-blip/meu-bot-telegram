@@ -685,32 +685,29 @@ async def mercadopago_webhook(request: Request):
                     print("⚠️ PAGAMENTO E CONVITE JÁ PROCESSADOS.")
                     return PlainTextResponse("OK")
 
-                print("🔄 PAGAMENTO APROVADO, MAS CONVITE AINDA NÃO FOI ENVIADO.")
+                print("🔄 PAGAMENTO APROVADO, MAS CONVITE AINDA NÃO FOI ENVIADO.") 
+            if pagamento_atual["status"] != "approved":
+                data_expiracao = (
+                    datetime.now(timezone.utc)
+                    + timedelta(days=30)
+                )
 
-            
+                supabase.table("payments").update({
+                    "status": "approved",
+                    "data_expiracao": data_expiracao.isoformat()
+                }).eq(
+                    "order_id", order_id
+                ).execute()
 
-            data_expiracao = (
-                datetime.now(timezone.utc)
-                + timedelta(days=30)
-            )
+                await registrar_acesso(
+                    telegram_user_id,
+                    pagamento_atual["id"]
+                )
 
-            supabase.table("payments").update({
-                "status": "approved",
-                "data_expiracao": data_expiracao.isoformat()
-            }).eq(
-                "order_id",
-                order_id
-            ).execute()
-
-            await registrar_acesso(
-                telegram_user_id,
-                pagamento_atual["id"]
-            )
-
-            print(
-                f"🎟️ ACESSO DE 30 DIAS REGISTRADO: "
-                f"{telegram_user_id}"
-            )
+                print(
+                    f"🎟️ ACESSO DE 30 DIAS REGISTRADO: "
+                    f"{telegram_user_id}"
+                )
 
             print(f"👤 USUÁRIO TELEGRAM: {telegram_user_id}")
 
