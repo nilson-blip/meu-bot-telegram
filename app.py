@@ -702,22 +702,20 @@ async def mercadopago_webhook(request: Request):
 
                 print("🔄 PAGAMENTO APROVADO, MAS CONVITE AINDA NÃO FOI ENVIADO.") 
                 
-                if pagamento_atual["status"] != "approved":
-                    dias_acesso = (
-                        supabase.table("products")
-                        .select("duration_days")
-                        .eq("id", 
-                        pagamento_atual["product_id"])
-                        .single()
-                        .execute()
-                        .data["duration_days"]
-                    )
+              if pagamento_atual["status"] != "approved":
+    dias_acesso = (
+        supabase.table("products")
+        .select("duration_days")
+        .eq("id", pagamento_atual["product_id"])
+        .single()
+        .execute()
+        .data["duration_days"]
+    )
 
-                    data_expiracao = (
-                        datetime.now(timezone.utc)
-                        + timedelta(days=dias_acesso)
-                    )
-                
+    data_expiracao = (
+        datetime.now(timezone.utc)
+        + timedelta(days=dias_acesso)
+    )                 
 
                 supabase.table("payments").update({
                     "status": "approved",
