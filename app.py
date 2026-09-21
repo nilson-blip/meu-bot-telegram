@@ -542,13 +542,11 @@ async def verificar_acessos_endpoint(request: Request):
 @app.post("/telegram")
 async def telegram_webhook(request: Request):
     try:
-                telegram =await 
-get_telegram_app()
-
+        telegram = await get_telegram_app()
         data = await request.json()
         update = Update.de_json(
-        data,
-        bot=telegram.bot,
+            data,
+            bot=telegram.bot,
         )
 
         await telegram.process_update(update)
