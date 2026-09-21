@@ -681,6 +681,17 @@ async def mercadopago_webhook(request: Request):
         order_data = data.get("data", {})
         order_id = order_data.get("id")
         data_id = request.query_params.get("data.id")
+               
+        ts = None
+        v1 = None
+
+        if x_signature:
+            for part in x_signature.split(","):
+                key, value = part.split("=", 1)
+                if key == "ts":
+                    ts = value
+                elif key == "v1":
+                    v1 = value
 
         if not order_id:
             return PlainTextResponse("OK")
