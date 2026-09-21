@@ -306,7 +306,7 @@ async def botoes(update: Update, context):
                 .eq("status", "active")
                 .limit(1)
                 .execute()
-            )
+        )
 
             produto = produto.data[0]
 
