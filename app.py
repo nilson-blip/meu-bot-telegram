@@ -665,6 +665,9 @@ async def telegram_webhook(request: Request):
 @app.post("/mercadopago")
 async def mercadopago_webhook(request: Request):
     try:
+        x_signature = request.headers.get("x-signature")
+        x_request_id = request.headers.get("x-request-id")
+
         data = await request.json()
         print("UPDATE TELEGRAM:")
         print(data)
