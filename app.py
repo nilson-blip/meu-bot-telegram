@@ -269,22 +269,22 @@ async def botoes(update: Update, context):
         try:
             supabase = get_supabase()
             
-            bot_username = (await 
-            context.bot.get_me()).username
-                         bot_data = (
-            supabase.table("telegram_bots")
-                    .select("id, client_id")
-                    .eq("username", bot_username)
-                    .eq("status", "active")
-                    .limit(1)
-                    .execute()
-)
+                        bot_username = (await context.bot.get_me()).username
 
-if not bot_data.data:
-    raise RuntimeError("Bot Telegram não cadastrado.")
+            bot_data = (
+                supabase.table("telegram_bots")
+                .select("id, client_id")
+                .eq("username", bot_username)
+                .eq("status", "active")
+                .limit(1)
+                .execute()
+            )
 
-bot_config = bot_data.data[0]
-client_id = bot_config["client_id"]
+            if not bot_data.data:
+                raise RuntimeError("Bot Telegram não cadastrado.")
+
+            bot_config = bot_data.data[0]
+            client_id = bot_config["client_id"]
             produto = (
                 supabase.table("products")
                 .select("*")
@@ -307,8 +307,7 @@ client_id = bot_config["client_id"]
             import requests
             import uuid
 
-            access_token = 
-os.getenv("MERCADOPAGO_ACCESS_TOKEN")
+            access_token = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
             
             headers = {
                 "Authorization": f"Bearer {access_token}",
@@ -320,10 +319,8 @@ os.getenv("MERCADOPAGO_ACCESS_TOKEN")
             order_data = {
                 "type": "online",
                 "total_amount": f"{preco:.2f}",
-                "external_reference": 
-f"vip_{query.from_user.id}",
-                "processing_mode":
-"automatic",
+                "external_reference": f"vip_{query.from_user.id}",
+                "processing_mode": "automatic",
                 "transactions": {
                     "payments": [
                         {
