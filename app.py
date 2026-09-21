@@ -285,6 +285,20 @@ async def botoes(update: Update, context):
 
             bot_config = bot_data.data[0]
             client_id = bot_config["client_id"]
+            conexao = (
+                supabase.table("payment_connections")
+                .select("id")
+                .eq("client_id", client_id)
+                .eq("status", "active")
+                .limit(1)
+                .execute()
+            )
+
+            if not conexao.data:
+                raise RuntimeError("Nenhuma conexão de pagamento ativa encontrada.")
+
+            payment_connection_id = conexao.data[0]["id"]
+
             produto = (
                 supabase.table("products")
                 .select("*")
@@ -293,9 +307,6 @@ async def botoes(update: Update, context):
                 .limit(1)
                 .execute()
             )
-
-            if not produto.data:
-                raise RuntimeError("Nenhum produto ativo encontrado.")
 
             produto = produto.data[0]
 
@@ -371,7 +382,7 @@ async def botoes(update: Update, context):
 "client_id": produto["client_id"],
 "product_id": produto_id,
 "vip_group_id": vip_group_id,
-"payment_connection_id": bot_config["payment_connection_id"],
+"payment_connection_id": payment_connection_id,
 }).execute()        
             
         except Exception as erro:
