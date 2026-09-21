@@ -295,7 +295,7 @@ async def botoes(update: Update, context):
             )
 
             if not conexao.data:
-                raise RuntimeError("Nenhuma conexão de pagamento ativa encontrada.")
+            raise RuntimeError("Nenhuma conexão de pagamento ativa encontrada.")
 
             payment_connection_id = conexao.data[0]["id"]
 
