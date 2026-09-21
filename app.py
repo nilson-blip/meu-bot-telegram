@@ -268,15 +268,16 @@ async def botoes(update: Update, context):
     if query.data in ["comprar", "renovar"]:
         try:
             supabase = get_supabase()
-bot_username = (await context.bot.get_me()).username
-
-bot_data = (
-    supabase.table("telegram_bots")
-    .select("id, client_id")
-    .eq("username", bot_username)
-    .eq("status", "active")
-    .limit(1)
-    .execute()
+            
+            bot_username = (await 
+            context.bot.get_me()).username
+                         bot_data = (
+            supabase.table("telegram_bots")
+                    .select("id, client_id")
+                    .eq("username", bot_username)
+                    .eq("status", "active")
+                    .limit(1)
+                    .execute()
 )
 
 if not bot_data.data:
