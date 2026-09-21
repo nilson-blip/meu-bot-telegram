@@ -288,7 +288,7 @@ async def botoes(update: Update, context):
             produto = (
                 supabase.table("products")
                 .select("*")
-                .eq("client_id", 1)
+                .eq.eq("client_id", client_id)
                 .eq("status", "active")
                 .limit(1)
                 .execute()
@@ -371,89 +371,10 @@ async def botoes(update: Update, context):
 "client_id": produto["client_id"],
 "product_id": produto_id,
 "vip_group_id": vip_group_id,
-"payment_connection_id": 1
+"payment_connection_id": bot_config["payment_connection_id"],
 }).execute()
 
-            print(
-                f"💾 PAGAMENTO REGISTRADO NO SUPABASE: "
-                f"{order_id}"
-            )
-
-            if query.data == "renovar":
-                mensagem = (
-                    "🔄 Renovação de acesso\n\n"
-                    "💰 Valor: R$ 1,00\n\n"
-                    "👇 Clique abaixo para pagar:"
-                )
-            else:
-                mensagem = (
-                    "🛒 VIP Teste\n\n"
-                    "💰 Valor: R$ 1,00\n\n"
-                    "👇 Clique abaixo para pagar:"
-                )
-
-            await query.message.reply_text(
-                f"{mensagem}\n\n{payment_url}"
-            )
-
-        except Exception as e:
-            print(
-                f"ERRO MERCADO PAGO: "
-                f"{type(e).__name__}: {e}"
-            )
-
-            await query.message.reply_text(
-                "❌ Não consegui gerar o pagamento agora."
-            )
-
-        return
-
-    respostas = {
-        "produtos": (
-            "📋 Produtos disponíveis\n\n"
-            "VIP Teste — R$ 1,00"
-        ),
-        "suporte": (
-            "❓ Suporte\n\n"
-            "Em breve você poderá falar com o suporte."
-        ),
-    }
-
-    await query.message.reply_text(
-        respostas.get(query.data, "Opção inválida.")
-    )
-async def verificar_acessos():
-    supabase = get_supabase()
-    agora = datetime.now(timezone.utc)
-
-    acessos = (
-        supabase.table("access_control")
-        .select("*")
-        .eq("status", "ativo")
-        .execute()
-    )
-
-    if not acessos.data:
-        print("🔎 NENHUM ACESSO ATIVO PARA VERIFICAR.")
-        return
-
-    telegram = await get_telegram_app()
-
-    vip_chat_id = -1004400475106
-
-    for acesso in acessos.data:
-        try:
-            telegram_user_id = acesso["telegram_user_id"]
-
-            expiracao = datetime.fromisoformat(
-                acesso["data_expiracao"].replace("Z", "+00:00")
-            )
-
-            segundos_restantes = (
-                expiracao - agora
-            ).total_seconds()
-
-            if (
+            
                 0 < segundos_restantes <= 120
                 and not acesso.get("aviso_2_enviado")
             ):
@@ -793,9 +714,9 @@ async def mercadopago_webhook(request: Request):
                                 # CRIA ASSINATURA
                 
                 supabase.table("subscriptions").insert({
-                    "client_id": 1,
-                    "vip_group_id": 1,
-                    "product_id": 1,
+                    "client_id": pagamento_atual["client_id"],
+                    "vip_group_id": pagamento_atual["vip_group_id"],
+                    "product_id": pagamento_atual["product_id"],
                     "telegram_user_id": telegram_user_id,
                     "payment_id": pagamento_atual["id"],
                     "status": "active",
@@ -810,10 +731,19 @@ async def mercadopago_webhook(request: Request):
 
             print(f"👤 USUÁRIO TELEGRAM: {telegram_user_id}")
 
-            telegram = await get_telegram_app()
+                        telegram = await get_telegram_app()
 
-            # ID do grupo VIP de teste
-            vip_chat_id = -1004400475106
+            vip_group_id = pagamento_atual["vip_group_id"]
+
+            vip_group = (
+            supabase.table("vip_groups")
+                .select("chat_id")
+                .eq("id", vip_group_id)
+                .single()
+                .execute()
+            )
+
+            vip_chat_id = vip_group.data["chat_id"]
 
             # Cria convite de uso único
             invite = await telegram.bot.create_chat_invite_link(
