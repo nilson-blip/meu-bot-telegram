@@ -41,7 +41,7 @@ def get_supabase():
         supabase_key 
     ) 
 
-async def registrar_bot():
+async def registrar_bot(client_id):
     supabase = get_supabase()
 
     telegram = await get_telegram_app()
@@ -68,7 +68,7 @@ async def registrar_bot():
     resultado = (
         supabase.table("telegram_bots")
         .insert({
-            "client_id": 1,
+            "client_id": client_id,
             "bot_id": bot_info.id,
             "username": bot_info.username,
             "bot_name": bot_info.first_name,
@@ -506,7 +506,7 @@ async def verificar_acessos():
 async def home():
     return PlainTextResponse("Bot online!")
 @app.get("/registrar-bot")
-async def registrar_bot_endpoint(request: Request):
+async def registrar_bot_endpoint(request: Request, client_id: int):
     cron_secret = os.getenv("CRON_SECRET")
     token = request.query_params.get("token")
 
@@ -517,7 +517,7 @@ async def registrar_bot_endpoint(request: Request):
         )
 
     try:
-        bot_id = await registrar_bot()
+        bot_id = await registrar_bot(client_id)
 
         return PlainTextResponse(
             f"Bot registrado. ID: {bot_id}"
