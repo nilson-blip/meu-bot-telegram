@@ -307,7 +307,6 @@ client_id = bot_config["client_id"]
             import uuid
 
             access_token = 
-            
 os.getenv("MERCADOPAGO_ACCESS_TOKEN")
             
             headers = {
