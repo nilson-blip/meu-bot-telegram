@@ -680,6 +680,7 @@ async def mercadopago_webhook(request: Request):
 
         order_data = data.get("data", {})
         order_id = order_data.get("id")
+        data_id = request.query_params.get("data.id")
 
         if not order_id:
             return PlainTextResponse("OK")
