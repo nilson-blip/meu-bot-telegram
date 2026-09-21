@@ -374,8 +374,103 @@ async def botoes(update: Update, context):
 "payment_connection_id": bot_config["payment_connection_id"],
 }).execute()
 
+async def verificar_acessos():
+    supabase = get_supabase()
+    telegram = await get_telegram_app()
+
+    agora = datetime.now(timezone.utc)
+
+    acessos = (
+        supabase.table("access_control")
+        .select("*")
+        .eq("status", "ativo")
+        .execute()
+    )
+
+    if not acessos.data:
+        print("🔎 NENHUM ACESSO ATIVO.")
+        return
+
+    for acesso in acessos.data:
+        try:
+            telegram_user_id = acesso["telegram_user_id"]
+            data_expiracao = datetime.fromisoformat(
+                acesso["data_expiracao"].replace("Z", "+00:00")
+            )
+
+            segundos_restantes = (
+                data_expiracao - agora
+            ).total_seconds()
+
+            if segundos_restantes <= 0:
+
+                pagamento = (
+                    supabase.table("payments")
+                    .select("vip_group_id")
+                    .eq("id", acesso["payment_id"])
+                    .limit(1)
+                    .execute()
+                )
+
+                if pagamento.data:
+                    vip_group_id = pagamento.data[0]["vip_group_id"]
+
+                    vip_group = (
+                        supabase.table("vip_groups")
+                        .select("chat_id")
+                        .eq("id", vip_group_id)
+                        .single()
+                        .execute()
+                    )
+
+                    vip_chat_id = vip_group.data["chat_id"]
+
+                    try:
+                        await telegram.bot.ban_chat_member(
+                            chat_id=vip_chat_id,
+                            user_id=telegram_user_id,
+                        )
+
+                        await telegram.bot.unban_chat_member(
+                            chat_id=vip_chat_id,
+                            user_id=telegram_user_id,
+                            only_if_banned=True,
+                        )
+
+                        print(
+                            f"🚪 USUÁRIO REMOVIDO DO VIP: "
+                            f"{telegram_user_id}"
+                        )
+
+                    except Exception as erro_remocao:
+                        print(
+                            f"⚠️ ERRO AO REMOVER "
+                            f"{telegram_user_id}: "
+                            f"{erro_remocao}"
+                        )
+
+                supabase.table("access_control").update({
+                    "status": "expirado",
+                    "atualizado_em": agora.isoformat()
+                }).eq(
+                    "telegram_user_id",
+                    telegram_user_id
+                ).execute()
+
+                print(
+                    f"⛔ ACESSO EXPIRADO: "
+                    f"{telegram_user_id}"
+                )
+
+        except Exception as erro:
+            print(
+                f"❌ ERRO AO VERIFICAR ACESSO: "
+                f"{acesso.get('telegram_user_id')}: {erro}"
+            )
+
 
 @app.get("/")
+
 async def home():
     return PlainTextResponse("Bot online!")
 @app.get("/registrar-bot")
