@@ -715,11 +715,11 @@ async def mercadopago_webhook(request: Request):
                 print(
                     f"🎟️ ACESSO DE 30 DIAS REGISTRADO: "
                     f"{telegram_user_id}"
-                )
+                )            
+                
+                print(f"👤 USUÁRIO TELEGRAM: {telegram_user_id}")
 
-            print(f"👤 USUÁRIO TELEGRAM: {telegram_user_id}")
-
-                        telegram = await get_telegram_app()
+            telegram = await get_telegram_app()  
 
             vip_group_id = pagamento_atual["vip_group_id"]
 
