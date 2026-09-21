@@ -212,7 +212,10 @@ async def registrar_acesso(telegram_user_id, payment_id):
             "atualizado_em": agora.isoformat()
         }).eq(
             "telegram_user_id",
-            telegram_user_id
+            telegram_user_id         
+        ).eq(
+            "client_id",
+            client_id
         ).execute()
 
         print(f"🔄 ACESSO RENOVADO: {telegram_user_id}")
