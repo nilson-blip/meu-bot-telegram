@@ -288,7 +288,7 @@ async def botoes(update: Update, context):
             produto = (
                 supabase.table("products")
                 .select("*")
-                .eq.eq("client_id", client_id)
+                .eq("client_id", client_id)
                 .eq("status", "active")
                 .limit(1)
                 .execute()
