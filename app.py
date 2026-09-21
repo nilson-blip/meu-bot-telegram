@@ -372,7 +372,12 @@ async def botoes(update: Update, context):
 "product_id": produto_id,
 "vip_group_id": vip_group_id,
 "payment_connection_id": bot_config["payment_connection_id"],
-}).execute()
+}).execute()        
+            
+        except Exception as erro:
+            print(f"❌ ERRO AO GERAR PAGAMENTO: {erro}")
+        return
+
 
 async def verificar_acessos():
     supabase = get_supabase()
