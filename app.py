@@ -692,8 +692,22 @@ async def mercadopago_webhook(request: Request):
                     ts = value
                 elif key == "v1":
                     v1 = value
-        
+                
         secret = os.getenv("MERCADOPAGO_WEBHOOK_SECRET")
+
+        manifest = f"id:{data_id};request-id:{x_request_id};ts:{ts};"
+        if not v1 or not secret:
+            return PlainTextResponse("Invalid signature", status_code=401)
+
+       
+        signature = hmac.new(
+            secret.encode(),
+            manifest.encode(),
+            hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(signature, v1):
+            return PlainTextResponse("Invalid signature", status_code=401)
 
         if not order_id:
             return PlainTextResponse("OK")
