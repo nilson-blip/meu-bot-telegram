@@ -163,16 +163,28 @@ async def verificar_remarketing():
             )
     
 async def registrar_acesso(telegram_user_id, payment_id):
-    supabase = get_supabase()
+    supabase = get_supabase()     
+    
+    pagamento = (
+        supabase.table("payments")
+        .select("dias_acesso, client_id")
+        .eq("id", payment_id)
+        .single()
+        .execute()
+    )
+
+    dias_acesso = pagamento.data["dias_acesso"] 
+    client_id = pagamento.data["client_id"]
 
     agora = datetime.now(timezone.utc)
 
     existente = (
-        supabase.table("access_control")
-        .select("*")
-        .eq("telegram_user_id", telegram_user_id)
-        .execute()
-    )
+    supabase.table("access_control")
+    .select("*")
+    .eq("telegram_user_id", telegram_user_id)
+    .eq("client_id", client_id)
+    .execute()
+)
 
     if existente.data:
         acesso = existente.data[0]
@@ -182,9 +194,9 @@ async def registrar_acesso(telegram_user_id, payment_id):
         )
 
         if expiracao_atual > agora:
-            nova_expiracao = expiracao_atual + timedelta(days=30)
+            nova_expiracao = expiracao_atual + timedelta(days=dias_acesso)
         else:
-            nova_expiracao = agora + timedelta(days=30)
+            nova_expiracao = agora + timedelta(days=dias_acesso)
 
         supabase.table("access_control").update({
             "payment_id": payment_id,
@@ -206,7 +218,7 @@ async def registrar_acesso(telegram_user_id, payment_id):
         print(f"🔄 ACESSO RENOVADO: {telegram_user_id}")
 
     else:
-        nova_expiracao = agora + timedelta(days=30)
+        nova_expiracao = agora + timedelta(days=dias_acesso)
 
         supabase.table("access_control").insert({
             "telegram_user_id": telegram_user_id,
