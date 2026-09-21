@@ -226,6 +226,7 @@ async def registrar_acesso(telegram_user_id, payment_id):
         supabase.table("access_control").insert({
             "telegram_user_id": telegram_user_id,
             "payment_id": payment_id,
+            "client_id": client_id,
             "data_inicio": agora.isoformat(),
             "data_expiracao": nova_expiracao.isoformat(),
             "status": "ativo"
