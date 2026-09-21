@@ -692,6 +692,8 @@ async def mercadopago_webhook(request: Request):
                     ts = value
                 elif key == "v1":
                     v1 = value
+        
+        secret = os.getenv("MERCADOPAGO_WEBHOOK_SECRET")
 
         if not order_id:
             return PlainTextResponse("OK")
