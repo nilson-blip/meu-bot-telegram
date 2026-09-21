@@ -269,7 +269,7 @@ async def botoes(update: Update, context):
         try:
             supabase = get_supabase()
             
-                        bot_username = (await context.bot.get_me()).username
+            bot_username = (await context.bot.get_me()).username
 
             bot_data = (
                 supabase.table("telegram_bots")
@@ -759,20 +759,17 @@ async def mercadopago_webhook(request: Request):
                     telegram_user_id,
                     pagamento_atual["id"]
                 ) 
-                # CRIA ASSINATURA
+                                # CRIA ASSINATURA
+                
                 supabase.table("subscriptions").insert({
                     "client_id": 1,
                     "vip_group_id": 1,
                     "product_id": 1,
-                    "telegram_user_id":
-                telegram_user_id,
-                    "payment_id":
-                pagamento_atual["id"],
+                    "telegram_user_id": telegram_user_id,
+                    "payment_id": pagamento_atual["id"],
                     "status": "active",
-                    "started_at":
-                datetime.now(timezone.utc).isoformat(),
-                    "expires_at": 
-                data_expiracao.isoformat()
+                    "started_at": datetime.now(timezone.utc).isoformat(),
+                    "expires_at": data_expiracao.isoformat()
                 }).execute()
 
                 print(
