@@ -719,10 +719,8 @@ async def mercadopago_webhook(request: Request):
             ).execute()             
             
             await registrar_acesso(
-            telegram_user_id,
             
-           
-                pagamento_atual["id"]
+            telegram_user_id,pagamento_atual["id"]
             )
                                 # CRIA ASSINATURA
                 
