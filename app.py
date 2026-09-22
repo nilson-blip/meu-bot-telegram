@@ -695,39 +695,37 @@ async def mercadopago_webhook(request: Request):
 
             pagamento_atual = pagamento.data[0]
 
-            if pagamento_atual["status"] == "approved":
-                if pagamento_atual.get("invite_enviado"):
-                    print("⚠️ PAGAMENTO E CONVITE JÁ PROCESSADOS.")
-                    return PlainTextResponse("OK")
+            if pagamento_atual.get("invite_enviado"):
+    print("⚠️ PAGAMENTO E CONVITE JÁ PROCESSADOS.")
+    return PlainTextResponse("OK")
 
-                print("🔄 PAGAMENTO APROVADO, MAS CONVITE AINDA NÃO FOI ENVIADO.") 
-                                  
-                if pagamento_atual["status"] != "approved":
-                    dias_acesso = (
-                        supabase.table("products")
-                        .select("duration_days")
-                        .eq("id", pagamento_atual["product_id"])
-                        .single()
-                        .execute()
-                        .data["duration_days"]
-                    )
+print("🔄 PROCESSANDO PAGAMENTO APROVADO.")
 
-                    data_expiracao = (
-                        datetime.now(timezone.utc)
-                        + timedelta(days=dias_acesso)
-                    )            
+dias_acesso = (
+    supabase.table("products")
+    .select("duration_days")
+    .eq("id", pagamento_atual["product_id"])
+    .single()
+    .execute()
+    .data["duration_days"]
+)
 
-                supabase.table("payments").update({
-                    "status": "approved",
-                    "data_expiracao": data_expiracao.isoformat()
-                }).eq(
-                    "order_id", order_id
-                ).execute()
+data_expiracao = (
+    datetime.now(timezone.utc)
+    + timedelta(days=dias_acesso)
+)
 
-                await registrar_acesso(
-                    telegram_user_id,
-                    pagamento_atual["id"]
-                ) 
+supabase.table("payments").update({
+    "status": "approved",
+    "data_expiracao": data_expiracao.isoformat()
+}).eq(
+    "order_id", order_id
+).execute()
+
+await registrar_acesso(
+    telegram_user_id,
+    pagamento_atual["id"]
+)
                                 # CRIA ASSINATURA
                 
                 supabase.table("subscriptions").insert({
