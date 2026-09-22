@@ -694,10 +694,11 @@ async def mercadopago_webhook(request: Request):
                 return PlainTextResponse("OK")
 
             pagamento_atual = pagamento.data[0]
+           
             if pagamento_atual.get("invite_enviado"):
-            print("⚠️ PAGAMENTO E CONVITE JÁ PROCESSADOS.")
-            return PlainTextResponse("OK")
-            print("🔄 PROCESSANDO PAGAMENTO APROVADO.")
+                print("⚠️ PAGAMENTO E CONVITE JÁ PROCESSADOS.")
+                return PlainTextResponse("OK")
+                print("🔄 PROCESSANDO PAGAMENTO APROVADO.")
             dias_acesso = (
             supabase.table("products")
                 .select("duration_days")
@@ -717,8 +718,8 @@ async def mercadopago_webhook(request: Request):
                 "order_id", order_id
             ).execute()
             await registrar_acesso(
-                telegram_user_id,
-                pagamento_atual["id"]
+            telegram_user_id,
+            pagamento_atual["id"]
             )
                                 # CRIA ASSINATURA
                 
