@@ -784,12 +784,12 @@ async def mercadopago_webhook(
           "Invalid signature",
             status_code=401
         )
-
-    signature = hmac.new(
-        secret.encode(),
-        manifest.encode(),
-        hashlib.sha256
-    ).hexdigest()
+            signature = hmac.new(
+                secret.encode(),
+                manifest.encode(),
+                hashlib.sha256
+            
+            ).hexdigest()
 
     if not hmac.compare_digest(
         signature,
