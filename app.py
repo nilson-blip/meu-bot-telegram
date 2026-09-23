@@ -609,7 +609,7 @@ async def registrar_bot_endpoint(
     request: Request,
     client_id: int
 ):
-cron_secret = os.getenv("CRON_SECRET")
+    cron_secret = os.getenv("CRON_SECRET")
 token = request.query_params.get("token")
 
 if not cron_secret or token != cron_secret:
