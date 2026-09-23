@@ -623,7 +623,7 @@ try:
         client_id
     )
 
-return PlainTextResponse(
+    return PlainTextResponse(
         f"Bot registrado. ID: {bot_id}"
     )
 
@@ -633,8 +633,7 @@ except Exception as e:
         f"{type(e).__name__}: {e}"
     )
 
-   
-   return PlainTextResponse(
+    return PlainTextResponse(
         "Erro ao registrar bot.",
         status_code=500,
     )
