@@ -487,17 +487,17 @@ async def botoes(update: Update, context):
     return
 
 async def verificar_acessos():
-supabase = get_supabase()
-telegram = await get_telegram_app()
+    supabase = get_supabase()
+    telegram = await get_telegram_app()
 
-agora = datetime.now(timezone.utc)
+    agora = datetime.now(timezone.utc)
 
-acessos = (
-    supabase.table("access_control")
-    .select("*")
-    .eq("status", "ativo")
-    .execute()
-)
+    acessos = (
+        supabase.table("access_control")
+        .select("*")
+        .eq("status", "ativo")
+        .execute()
+    )
 
 if not acessos.data:
     print("🔎 NENHUM ACESSO ATIVO.")
