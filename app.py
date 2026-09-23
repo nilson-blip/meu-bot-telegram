@@ -442,7 +442,7 @@ async def botoes(update: Update, context):
                 ["ticket_url"]
             )
 
-            order_id = order["id"]          )
+            order_id = order["id"]
 
 
         order_id = order["id"]
