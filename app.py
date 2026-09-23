@@ -742,20 +742,20 @@ async def mercadopago_webhook(
             "id"
         )
 
+        
         data_id = request.query_params.get(
             "data.id"
         )
 
-    ts = None
-    v1 = None
+        ts = None
+        v1 = None
 
-    if x_signature:
-        for part in x_signature.split(","):
-            key, value = part.split(
-                "=",
-                1
-            )
-
+        if x_signature:
+            for part in x_signature.split(","):
+                key, value = part.split(
+                    "=",
+                    1
+                )
             if key == "ts":
                 ts = value
 
