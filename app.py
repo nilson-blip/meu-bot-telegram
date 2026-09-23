@@ -854,8 +854,8 @@ async def mercadopago_webhook(
     )
         
         if status == "processed":
-
-        print(
+            
+            print(
             "✅ PAGAMENTO APROVADO!"
         )
 
