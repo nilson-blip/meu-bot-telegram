@@ -419,14 +419,14 @@ async def botoes(update: Update, context):
             }
         }
             
-            response = requests.post(
+                        response = requests.post(
                 "https://api.mercadopago.com/v1/orders",
                 headers=headers,
                 json=order_data,
                 timeout=20,
             )
-            
-                 print(
+
+            print(
                 "MERCADO PAGO:",
                 response.status_code
             )
