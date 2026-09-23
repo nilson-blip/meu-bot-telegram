@@ -698,29 +698,29 @@ async def telegram_webhook(
             f"{type(e).__name__}: {e}"
         )
 
-        return PlainTextResponse(
-            f"Erro: {type(e).__name__}: {e}",
-            status_code=500,
-        )
+    return PlainTextResponse(
+    f"Erro: {type(e).__name__}: {e}",
+    status_code=500,
+)
 
 @app.post("/mercadopago")
 async def mercadopago_webhook(
-request: Request
+    request: Request
 ):
-try:
-x_signature = request.headers.get(
-"x-signature"
-)
+    try:
+        x_signature = request.headers.get(
+            "x-signature"
+        )
 
-    x_request_id = request.headers.get(
-        "x-request-id"
-    )
+        x_request_id = request.headers.get(
+            "x-request-id"
+        )
 
-    data = await request.json()
+        data = await request.json()
 
-    print(
-        "WEBHOOK MERCADO PAGO:"
-    )
+        print(
+            "WEBHOOK MERCADO PAGO:"
+        )
 
     print(data)
 
