@@ -633,10 +633,11 @@ except Exception as e:
         f"{type(e).__name__}: {e}"
     )
 
+   
    return PlainTextResponse(
-    "Erro ao registrar bot.",
-    status_code=500,
-)
+        "Erro ao registrar bot.",
+        status_code=500,
+    )
 
 @app.get("/verificar-acessos")
 async def verificar_acessos_endpoint(
@@ -649,7 +650,7 @@ async def verificar_acessos_endpoint(
         return PlainTextResponse(
             "Não autorizado.",
             status_code=401,
-        ) 
+        )
 
 try:
     await verificar_remarketing()
