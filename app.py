@@ -443,39 +443,38 @@ async def botoes(update: Update, context):
             )
             order_id = order["id"]
 
-            supabase.table("payments").insert({
+                        supabase.table("payments").insert({
                 "order_id": order_id,
                 "telegram_user_id": query.from_user.id,
                 "amount": preco,
                 "status": "pending",
                 "external_reference": (
-            
-                order["external_reference"]
-            ),
-            "dias_acesso": dias_acesso,
-            "data_expiracao": None,
-            "payment_url": payment_url,
-            "remarketing_enviado": False,
-            "client_id": produto["client_id"],
-            "product_id": produto_id,
-            "vip_group_id": vip_group_id,
-            "payment_connection_id": (
-                payment_connection_id
-            ),
-        }).execute()
+                    order["external_reference"]
+                ),
+                "dias_acesso": dias_acesso,
+                "data_expiracao": None,
+                "payment_url": payment_url,
+                "remarketing_enviado": False,
+                "client_id": produto["client_id"],
+                "product_id": produto_id,
+                "vip_group_id": vip_group_id,
+                "payment_connection_id": (
+                    payment_connection_id
+                ),
+            }).execute()
 
-        await context.bot.send_message(
-            chat_id=query.from_user.id,
-            text=(
-                "💰 Pix gerado!\n\n"
-                "👇 Clique abaixo para realizar o pagamento:"
-            ),
-            reply_markup=InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton(
-                        "💳 Pagar com Pix",
-                        url=payment_url
-                    )
+            await context.bot.send_message(
+                chat_id=query.from_user.id,
+                text=(
+                    "💰 Pix gerado!\n\n"
+                    "👇 Clique abaixo para realizar o pagamento:"
+                ),
+                reply_markup=InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton(
+                            "💳 Pagar com Pix",
+                            url=payment_url
+                        )
                 ]
             ])
         )
