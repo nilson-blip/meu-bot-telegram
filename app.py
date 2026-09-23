@@ -803,7 +803,7 @@ async def mercadopago_webhook(
                 return PlainTextResponse(
               "OK"
         )
-
+                
     print(
         f"ORDER RECEBIDA: {order_id}"
     )
