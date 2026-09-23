@@ -716,18 +716,18 @@ async def mercadopago_webhook(
             "x-request-id"
         )
 
-        data = await request.json()
+            data = await request.json()
 
         print(
             "WEBHOOK MERCADO PAGO:"
         )
 
-    print(data)
+        print(data)
 
-    if data.get("type") != "order":
-        return PlainTextResponse(
-            "OK"
-        )
+        if data.get("type") != "order":
+            return PlainTextResponse(
+                "OK"
+            )
 
     order_data = data.get(
         "data",
