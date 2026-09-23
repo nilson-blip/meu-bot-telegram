@@ -291,13 +291,12 @@ if not _initialized:
 return telegram_app
 
 async def start(update: Update, context):
-
-botoes = [
-    [
-        InlineKeyboardButton(
-            "🛒 Comprar",
-            callback_data="comprar"
-        )
+    botoes = [
+        [
+            InlineKeyboardButton(
+                "🛒 Comprar",
+                callback_data="comprar"
+            )
     ],
     [
         InlineKeyboardButton(
