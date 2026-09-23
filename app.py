@@ -852,8 +852,8 @@ async def mercadopago_webhook(
         f"REFERÊNCIA: "
         f"{external_reference}"
     )
-
-    if status == "processed":
+        
+        if status == "processed":
 
         print(
             "✅ PAGAMENTO APROVADO!"
