@@ -463,6 +463,7 @@ async def botoes(update: Update, context):
                 ),
             }).execute()
 
+                  
             await context.bot.send_message(
                 chat_id=query.from_user.id,
                 text=(
@@ -475,15 +476,16 @@ async def botoes(update: Update, context):
                             "💳 Pagar com Pix",
                             url=payment_url
                         )
-                ]
-            ])
-        )
-except Exception as erro:
-    print(
-            f"❌ ERRO AO GERAR PAGAMENTO: {erro}"
-        )
+                    ]
+                ])
+            )
 
-    return
+        except Exception as erro:
+            print(
+                f"❌ ERRO AO GERAR PAGAMENTO: {erro}"
+            )
+
+    return 
 
 async def verificar_acessos():
     supabase = get_supabase()
