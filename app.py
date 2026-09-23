@@ -806,28 +806,25 @@ async def mercadopago_webhook(
                         
                 print(
             f"ORDER RECEBIDA: {order_id}"
-        )
-                print(
-            f"ORDER RECEBIDA: {order_id}"
-        )
+                )
 
-        access_token = os.getenv(
+                access_token = os.getenv(
             "MERCADOPAGO_ACCESS_TOKEN"
         )
-        
+
         headers = {
-        "Authorization": (
-            f"Bearer {access_token}"
+            "Authorization": (
+                f"Bearer {access_token}"
+            )
+        }
+
+        import requests
+
+        response = requests.get(
+            f"https://api.mercadopago.com/v1/orders/{order_id}",
+            headers=headers,
+            timeout=20,
         )
-    }
-
-    import requests
-
-    response = requests.get(
-        f"https://api.mercadopago.com/v1/orders/{order_id}",
-        headers=headers,
-        timeout=20,
-    )
 
     print(
         "CONSULTA ORDER:",
