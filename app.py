@@ -163,7 +163,7 @@ for pagamento in pagamentos.data:
         print(
             f"❌ ERRO NO REMARKETING: "
             f"{pagamento.get('id')}: {erro}"
-        )
+        
         )
 
 async def registrar_acesso(telegram_user_id, payment_id):
