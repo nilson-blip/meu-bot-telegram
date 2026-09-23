@@ -807,7 +807,7 @@ async def mercadopago_webhook(
                 print(
             f"ORDER RECEBIDA: {order_id}"
         )
-                        print(
+                print(
             f"ORDER RECEBIDA: {order_id}"
         )
 
