@@ -399,7 +399,23 @@ async def botoes(update: Update, context):
 "product_id": produto_id,
 "vip_group_id": vip_group_id,
 "payment_connection_id": payment_connection_id,
-}).execute()        
+}).execute()  
+
+await context.bot.send_message(
+    chat_id=query.from_user.id,
+    text=(
+        "💰 Pix gerado!\n\n"
+        "👇 Clique abaixo para realizar o pagamento:"
+    ),
+    reply_markup=InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "💳 Pagar com Pix",
+                url=payment_url
+            )
+        ]
+    ])
+)      
             
         except Exception as erro:
             print(f"❌ ERRO AO GERAR PAGAMENTO: {erro}")
