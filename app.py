@@ -478,8 +478,7 @@ async def botoes(update: Update, context):
                 ]
             ])
         )
-
-    except Exception as erro:
+            except Exception as erro:
         print(
             f"❌ ERRO AO GERAR PAGAMENTO: {erro}"
         )
