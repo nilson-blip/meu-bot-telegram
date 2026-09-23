@@ -844,12 +844,11 @@ async def mercadopago_webhook(
         external_reference = order.get(
         "external_reference"
     )
-
-    print(
+        
+        print(
         f"STATUS: {status}"
     )
-
-    print(
+        print(
         f"REFERÊNCIA: "
         f"{external_reference}"
     )
