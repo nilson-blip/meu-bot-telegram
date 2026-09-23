@@ -338,22 +338,22 @@ async def botoes(update: Update, context):
                 .execute()
             )
 
-        if not bot_data.data:
-            raise RuntimeError(
-                "Bot Telegram não cadastrado."
+            if not bot_data.data:
+                raise RuntimeError(
+                    "Bot Telegram não cadastrado."
+                )
+
+            bot_config = bot_data.data[0]
+            client_id = bot_config["client_id"]
+
+            conexao = (
+                supabase.table("payment_connections")
+                .select("id")
+                .eq("client_id", client_id)
+                .eq("status", "active")
+                .limit(1)
+                .execute()
             )
-
-        bot_config = bot_data.data[0]
-        client_id = bot_config["client_id"]
-
-        conexao = (
-            supabase.table("payment_connections")
-            .select("id")
-            .eq("client_id", client_id)
-            .eq("status", "active")
-            .limit(1)
-            .execute()
-        )
 
         if not conexao.data:
             raise RuntimeError(
