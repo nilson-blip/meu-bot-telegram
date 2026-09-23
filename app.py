@@ -30,16 +30,16 @@ _initialized = False
 _init_lock = asyncio.Lock()
 
 def get_supabase():
-supabase_url = os.getenv("SUPABASE_URL")
-supabase_key = os.getenv("SUPABASE_SECRET_KEY")
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_SECRET_KEY")
 
-if not supabase_url or not supabase_key:
-    raise RuntimeError("Supabase não configurado no Vercel.")
+    if not supabase_url or not supabase_key:
+        raise RuntimeError("Supabase não configurado no Vercel.")
 
-return create_client(
-    supabase_url,
-    supabase_key
-)
+    return create_client(
+        supabase_url,
+        supabase_key
+    )
 
 async def registrar_bot(client_id):
 supabase = get_supabase()
