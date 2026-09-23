@@ -445,7 +445,7 @@ async def botoes(update: Update, context):
             order_id = order["id"]
 
         supabase.table("payments").insert({
-            "order_id": order_id,
+        "order_id": order_id,
             "telegram_user_id": query.from_user.id,
             "amount": preco,
             "status": "pending",
