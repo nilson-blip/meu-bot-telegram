@@ -807,10 +807,13 @@ async def mercadopago_webhook(
                 print(
             f"ORDER RECEBIDA: {order_id}"
         )
+                        print(
+            f"ORDER RECEBIDA: {order_id}"
+        )
 
-    access_token = os.getenv(
-        "MERCADOPAGO_ACCESS_TOKEN"
-    )
+        access_token = os.getenv(
+            "MERCADOPAGO_ACCESS_TOKEN"
+        )
 
     headers = {
         "Authorization": (
