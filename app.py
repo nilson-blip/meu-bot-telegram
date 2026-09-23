@@ -389,12 +389,12 @@ async def botoes(update: Update, context):
             access_token = os.getenv(
                 "MERCADOPAGO_ACCESS_TOKEN"
             )
-
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
-            "X-Idempotency-Key": str(uuid.uuid4()),
-        }
+            
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+                "X-Idempotency-Key": str(uuid.uuid4()),
+            }
 
         order_data = {
             "type": "online",
