@@ -633,23 +633,23 @@ except Exception as e:
         f"{type(e).__name__}: {e}"
     )
 
-    return PlainTextResponse(
-        "Erro ao registrar bot.",
-        status_code=500,
-    )
+   return PlainTextResponse(
+    "Erro ao registrar bot.",
+    status_code=500,
+)
 
 @app.get("/verificar-acessos")
 async def verificar_acessos_endpoint(
-request: Request
+    request: Request
 ):
-cron_secret = os.getenv("CRON_SECRET")
-token = request.query_params.get("token")
+    cron_secret = os.getenv("CRON_SECRET")
+    token = request.query_params.get("token")
 
-if not cron_secret or token != cron_secret:
-    return PlainTextResponse(
-        "Não autorizado.",
-        status_code=401,
-    )
+    if not cron_secret or token != cron_secret:
+        return PlainTextResponse(
+            "Não autorizado.",
+            status_code=401,
+        ) 
 
 try:
     await verificar_remarketing()
