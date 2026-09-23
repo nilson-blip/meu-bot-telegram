@@ -257,15 +257,15 @@ else:
     )
 
 async def get_telegram_app():
-global telegram_app, _initialized
+    global telegram_app, _initialized
 
-if telegram_app is None:
-    token = os.getenv("BOT_TOKEN")
+    if telegram_app is None:
+        token = os.getenv("BOT_TOKEN")
 
-    if not token:
-        raise RuntimeError(
-            "BOT_TOKEN não configurado no Vercel."
-        )
+        if not token:
+            raise RuntimeError(
+                "BOT_TOKEN não configurado no Vercel."
+            )
 
     telegram_app = (
         Application.builder()
