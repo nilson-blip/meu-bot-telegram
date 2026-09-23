@@ -425,7 +425,8 @@ async def botoes(update: Update, context):
                 json=order_data,
                 timeout=20,
             
-                print(
+               
+            print(
                 "MERCADO PAGO:",
                 response.status_code
             )
