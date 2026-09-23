@@ -840,8 +840,8 @@ async def mercadopago_webhook(
         status = order.get(
             "status"
         )
-
-    external_reference = order.get(
+        
+        external_reference = order.get(
         "external_reference"
     )
 
