@@ -42,16 +42,18 @@ def get_supabase():
     )
 
 async def registrar_bot(client_id):
-supabase = get_supabase()
+    supabase = get_supabase()
 
-telegram = await get_telegram_app()
+    telegram = await get_telegram_app()
 
-bot_info = await telegram.bot.get_me()
+    bot_info = await telegram.bot.get_me()
 
-print(
-    f"🤖 BOT IDENTIFICADO: "
-    f"{bot_info.id} | @{bot_info.username}"
-)
+    print(
+        f"🤖 BOT IDENTIFICADO: "
+        f"{bot_info.id} | @{bot_info.username}"
+    )
+
+
 
 existente = (
     supabase.table("telegram_bots")
