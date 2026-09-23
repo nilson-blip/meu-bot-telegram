@@ -817,7 +817,7 @@ async def mercadopago_webhook(
                 f"Bearer {access_token}"
             )
         }
-
+              
         import requests
 
         response = requests.get(
@@ -826,20 +826,20 @@ async def mercadopago_webhook(
             timeout=20,
         )
 
-    print(
-        "CONSULTA ORDER:",
-        response.status_code
-    )
+        print(
+            "CONSULTA ORDER:",
+            response.status_code
+        )
 
-    print(response.text)
+        print(response.text)
 
-    response.raise_for_status()
+        response.raise_for_status()
 
-    order = response.json()
+        order = response.json()
 
-    status = order.get(
-        "status"
-    )
+        status = order.get(
+            "status"
+        )
 
     external_reference = order.get(
         "external_reference"
