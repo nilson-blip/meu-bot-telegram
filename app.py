@@ -814,8 +814,8 @@ async def mercadopago_webhook(
         access_token = os.getenv(
             "MERCADOPAGO_ACCESS_TOKEN"
         )
-
-    headers = {
+        
+        headers = {
         "Authorization": (
             f"Bearer {access_token}"
         )
