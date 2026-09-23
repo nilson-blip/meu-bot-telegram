@@ -788,7 +788,7 @@ async def mercadopago_webhook(
             secret.encode(),
             manifest.encode(),
             hashlib.sha256
-        ).hexdigest()
+      ).hexdigest()
 
         if not hmac.compare_digest(
             signature,
