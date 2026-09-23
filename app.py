@@ -798,10 +798,10 @@ async def mercadopago_webhook(
                 "Invalid signature",
                 status_code=401
             )
-
-    if not order_id:
-        return PlainTextResponse(
-            "OK"
+            
+            if not order_id:
+                return PlainTextResponse(
+              "OK"
         )
 
     print(
