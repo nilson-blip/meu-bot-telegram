@@ -665,43 +665,43 @@ except Exception as e:
         f"{type(e).__name__}: {e}"
     )
 
-    return PlainTextResponse(
-        "Erro na verificação.",
-        status_code=500,
-    )
+return PlainTextResponse(
+    "Erro na verificação.",
+    status_code=500,
+)
 
 @app.post("/telegram")
 async def telegram_webhook(
-request: Request
+    request: Request
 ):
-try:
-telegram = await get_telegram_app()
+    try:
+        telegram = await get_telegram_app()
 
-    data = await request.json()
+        data = await request.json()
 
-    update = Update.de_json(
-        data,
-        bot=telegram.bot,
-    )
+        update = Update.de_json(
+            data,
+            bot=telegram.bot,
+        )
 
-    await telegram.process_update(
-        update
-    )
+        await telegram.process_update(
+            update
+        )
 
-    return PlainTextResponse(
-        "OK"
-    )
+        return PlainTextResponse(
+            "OK"
+        )
 
-except Exception as e:
-    print(
-        f"ERRO NO WEBHOOK: "
-        f"{type(e).__name__}: {e}"
-    )
+    except Exception as e:
+        print(
+            f"ERRO NO WEBHOOK: "
+            f"{type(e).__name__}: {e}"
+        )
 
-    return PlainTextResponse(
-        f"Erro: {type(e).__name__}: {e}",
-        status_code=500,
-    )
+        return PlainTextResponse(
+            f"Erro: {type(e).__name__}: {e}",
+            status_code=500,
+        )
 
 @app.post("/mercadopago")
 async def mercadopago_webhook(
