@@ -600,14 +600,14 @@ for acesso in acessos.data:
 
 @app.get("/")
 async def home():
-return PlainTextResponse(
-"Bot online!"
-)
+    return PlainTextResponse(
+        "Bot online!"
+    )
 
 @app.get("/registrar-bot")
 async def registrar_bot_endpoint(
-request: Request,
-client_id: int
+    request: Request,
+    client_id: int
 ):
 cron_secret = os.getenv("CRON_SECRET")
 token = request.query_params.get("token")
