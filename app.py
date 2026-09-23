@@ -762,7 +762,8 @@ async def mercadopago_webhook(
             elif key == "v1":
                 v1 = value
                            
-                if key == "ts":
+            
+            if key == "ts":
                 ts = value
 
             elif key == "v1":
