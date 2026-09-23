@@ -623,7 +623,7 @@ try:
         client_id
     )
 
-    return PlainTextResponse(
+return PlainTextResponse(
         f"Bot registrado. ID: {bot_id}"
     )
 
