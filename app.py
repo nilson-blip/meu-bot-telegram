@@ -728,19 +728,23 @@ async def mercadopago_webhook(
             return PlainTextResponse(
                 "OK"
             )
+        return PlainTextResponse(
+            "OK"
+        )
 
-    order_data = data.get(
-        "data",
-        {}
-    )
+        
+        order_data = data.get(
+            "data",
+            {}
+        )
 
-    order_id = order_data.get(
-        "id"
-    )
+        order_id = order_data.get(
+            "id"
+        )
 
-    data_id = request.query_params.get(
-        "data.id"
-    )
+        data_id = request.query_params.get(
+            "data.id"
+        )
 
     ts = None
     v1 = None
