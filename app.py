@@ -1082,7 +1082,7 @@ async def mercadopago_webhook(
             "🚀 ACESSO VIP ENVIADO!"
         )
 
-    elif status == "failed":
+     elif status == "failed":
 
         print(
             "❌ PAGAMENTO FALHOU"
