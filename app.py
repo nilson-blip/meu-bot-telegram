@@ -164,17 +164,18 @@ for pagamento in pagamentos.data:
             f"❌ ERRO NO REMARKETING: "
             f"{pagamento.get('id')}: {erro}"
         )
+        )
 
 async def registrar_acesso(telegram_user_id, payment_id):
-supabase = get_supabase()
+    supabase = get_supabase()
 
-pagamento = (
-    supabase.table("payments")
-    .select("dias_acesso, client_id")
-    .eq("id", payment_id)
-    .single()
-    .execute()
-)
+    pagamento = (
+        supabase.table("payments")
+        .select("dias_acesso, client_id")
+        .eq("id", payment_id)
+        .single()
+        .execute()
+    )
 
 if not pagamento.data:
     raise RuntimeError("Pagamento não encontrado.")
