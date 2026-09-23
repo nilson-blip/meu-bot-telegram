@@ -21,7 +21,7 @@ CallbackQueryHandler,
 mp_token = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
 
 if not mp_token:
-raise RuntimeError("MERCADOPAGO_ACCESS_TOKEN não configurado.")
+    raise RuntimeError("MERCADOPAGO_ACCESS_TOKEN não configurado.")
 
 mp = mercadopago.SDK(mp_token)
 
