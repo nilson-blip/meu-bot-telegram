@@ -779,10 +779,10 @@ async def mercadopago_webhook(
             f"ts:{ts};"
         )
         
-     if not v1 or not secret:
+        if not v1 or not secret:
          return PlainTextResponse(
-        "Invalid signature",
-    status_code=401
+          "Invalid signature",
+            status_code=401
         )
 
     signature = hmac.new(
