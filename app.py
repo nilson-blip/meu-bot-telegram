@@ -85,8 +85,8 @@ print("🤖 BOT REGISTRADO NO SUPABASE.")
 return resultado.data[0]["id"]
 
 async def verificar_remarketing():
-supabase = get_supabase()
-agora = datetime.now(timezone.utc)
+    supabase = get_supabase()
+    agora = datetime.now(timezone.utc)
 
 pagamentos = (
     supabase.table("payments")
