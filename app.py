@@ -769,15 +769,15 @@ async def mercadopago_webhook(
             elif key == "v1":
                 v1 = value
 
-        secret = os.getenv(
+                secret = os.getenv(
             "MERCADOPAGO_WEBHOOK_SECRET"
         )
 
-    manifest = (
-        f"id:{data_id};"
-        f"request-id:{x_request_id};"
-        f"ts:{ts};"
-    )
+        manifest = (
+            f"id:{data_id};"
+            f"request-id:{x_request_id};"
+            f"ts:{ts};"
+        )
 
     if not v1 or not secret:
         return PlainTextResponse(
