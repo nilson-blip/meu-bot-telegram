@@ -733,11 +733,13 @@ async def mercadopago_webhook(request: Request):
             }).eq(
                 "order_id", order_id
             ).execute()
-                        await registrar_acesso(
+
+            await registrar_acesso(
                 telegram_user_id,
                 pagamento_atual["id"]
-            )
-                                # CRIA ASSINATURA
+            )                                
+
+# CRIA ASSINATURA
                 
                 supabase.table("subscriptions").insert({
                     "client_id": pagamento_atual["client_id"],
