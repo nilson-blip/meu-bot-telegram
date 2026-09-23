@@ -1082,56 +1082,56 @@ async def mercadopago_webhook(
             "🚀 ACESSO VIP ENVIADO!"
         )
 
-     elif status == "failed":
+            elif status == "failed":
 
-        print(
-            "❌ PAGAMENTO FALHOU"
+            print(
+                "❌ PAGAMENTO FALHOU"
+            )
+
+            supabase.table(
+                "payments"
+            ).update({
+                "status": "failed"
+            }).eq(
+                "order_id",
+                order_id
+            ).execute()
+
+        elif status == "refunded":
+
+            print(
+                "↩️ PAGAMENTO ESTORNADO"
+            )
+
+            supabase.table(
+                "payments"
+            ).update({
+                "status": "refunded"
+            }).eq(
+                "order_id",
+                order_id
+            ).execute()
+
+        elif status == "expired":
+
+            print(
+                "⏰ PAGAMENTO EXPIRADO"
+            )
+
+            supabase.table(
+                "payments"
+            ).update({
+                "status": "expired"
+            }).eq(
+                "order_id",
+                order_id
+            ).execute()
+
+        return PlainTextResponse(
+            "OK"
         )
 
-        supabase.table(
-            "payments"
-        ).update({
-            "status": "failed"
-        }).eq(
-            "order_id",
-            order_id
-        ).execute()
-
-    elif status == "refunded":
-
-        print(
-            "↩️ PAGAMENTO ESTORNADO"
-        )
-
-        supabase.table(
-            "payments"
-        ).update({
-            "status": "refunded"
-        }).eq(
-            "order_id",
-            order_id
-        ).execute()
-
-    elif status == "expired":
-
-        print(
-            "⏰ PAGAMENTO EXPIRADO"
-        )
-
-        supabase.table(
-            "payments"
-        ).update({
-            "status": "expired"
-        }).eq(
-            "order_id",
-            order_id
-        ).execute()
-
-    return PlainTextResponse(
-        "OK"
-    )
-
-except Exception as e:
+    except Exception as e:
 
     print(
         "ERRO WEBHOOK MERCADO PAGO: "
