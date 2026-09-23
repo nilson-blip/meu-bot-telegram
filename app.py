@@ -370,25 +370,25 @@ async def botoes(update: Update, context):
                 .limit(1)
                 .execute()
             )
+            
+            if not produto.data:
+                raise RuntimeError(
+                    "Nenhum produto ativo encontrado."
+                )
 
-        if not produto.data:
-            raise RuntimeError(
-                "Nenhum produto ativo encontrado."
+            produto = produto.data[0]
+
+            produto_id = produto["id"]
+            preco = float(produto["price"])
+            dias_acesso = produto["duration_days"]
+            vip_group_id = produto["vip_group_id"]
+
+            import requests
+            import uuid
+
+            access_token = os.getenv(
+                "MERCADOPAGO_ACCESS_TOKEN"
             )
-
-        produto = produto.data[0]
-
-        produto_id = produto["id"]
-        preco = float(produto["price"])
-        dias_acesso = produto["duration_days"]
-        vip_group_id = produto["vip_group_id"]
-
-        import requests
-        import uuid
-
-        access_token = os.getenv(
-            "MERCADOPAGO_ACCESS_TOKEN"
-        )
 
         headers = {
             "Authorization": f"Bearer {access_token}",
