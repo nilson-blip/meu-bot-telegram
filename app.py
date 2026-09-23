@@ -418,30 +418,32 @@ async def botoes(update: Update, context):
                 "email": "nilsondeabreu.lp@gmail.com"
             }
         }
+            
+            response = requests.post(
+                "https://api.mercadopago.com/v1/orders",
+                headers=headers,
+                json=order_data,
+                timeout=20,
+            
+                print(
+                "MERCADO PAGO:",
+                response.status_code
+            )
 
-        response = requests.post(
-            "https://api.mercadopago.com/v1/orders",
-            headers=headers,
-            json=order_data,
-            timeout=20,
-        )
+            print(response.text)
 
-        print(
-            "MERCADO PAGO:",
-            response.status_code
-        )
+            response.raise_for_status()
 
-        print(response.text)
+            order = response.json()
 
-        response.raise_for_status()
+            payment_url = (
+                order["transactions"]["payments"][0]
+                ["payment_method"]
+                ["ticket_url"]
+            )
 
-        order = response.json()
+            order_id = order["id"]          )
 
-        payment_url = (
-            order["transactions"]["payments"][0]
-            ["payment_method"]
-            ["ticket_url"]
-        )
 
         order_id = order["id"]
 
