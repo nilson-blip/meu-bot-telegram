@@ -716,7 +716,7 @@ async def mercadopago_webhook(
             "x-request-id"
         )
 
-            data = await request.json()
+        data = await request.json()
 
         print(
             "WEBHOOK MERCADO PAGO:"
