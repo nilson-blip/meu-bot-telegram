@@ -395,8 +395,8 @@ async def botoes(update: Update, context):
                 "Content-Type": "application/json",
                 "X-Idempotency-Key": str(uuid.uuid4()),
             }
-
-        order_data = {
+            
+            order_data = {
             "type": "online",
             "total_amount": f"{preco:.2f}",
             "external_reference": (
