@@ -441,15 +441,15 @@ async def botoes(update: Update, context):
                 ["payment_method"]
                 ["ticket_url"]
             )
-
             order_id = order["id"]
 
-        supabase.table("payments").insert({
-        "order_id": order_id,
-            "telegram_user_id": query.from_user.id,
-            "amount": preco,
-            "status": "pending",
-            "external_reference": (
+            supabase.table("payments").insert({
+                "order_id": order_id,
+                "telegram_user_id": query.from_user.id,
+                "amount": preco,
+                "status": "pending",
+                "external_reference": (
+            
                 order["external_reference"]
             ),
             "dias_acesso": dias_acesso,
