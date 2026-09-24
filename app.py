@@ -1130,15 +1130,15 @@ async def mercadopago_webhook(
         return PlainTextResponse(
             "OK"
         )
-
+   
     except Exception as e:
 
-    print(
-        "ERRO WEBHOOK MERCADO PAGO: "
-        f"{type(e).__name__}: {e}"
-    )
+        print(
+            "ERRO WEBHOOK MERCADO PAGO: "
+            f"{type(e).__name__}: {e}"
+        )
 
-    return PlainTextResponse(
-        "Erro",
-        status_code=500,
-    )
+        return PlainTextResponse(
+            "Erro",
+            status_code=500,
+        )
