@@ -229,7 +229,7 @@ supabase.table("access_control").insert({
         }).execute()
       
 
-        print(f"🆕 ACESSO CRIADO: {telegram_user_id}")
+     print(f"🆕 ACESSO CRIADO: {telegram_user_id}")
       
         supabase.table("access_control").update({
         "aviso_10_enviado": False,
