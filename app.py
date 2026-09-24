@@ -1082,7 +1082,8 @@ async def mercadopago_webhook(
             "🚀 ACESSO VIP ENVIADO!"
         )
 
-        elif status == "failed":
+    
+        if status == "failed":
 
             print(
                 "❌ PAGAMENTO FALHOU"
@@ -1097,7 +1098,7 @@ async def mercadopago_webhook(
                 order_id
             ).execute()
 
-        elif status == "refunded":
+        if status == "refunded":
 
             print(
                 "↩️ PAGAMENTO ESTORNADO"
@@ -1112,7 +1113,7 @@ async def mercadopago_webhook(
                 order_id
             ).execute()
 
-        elif status == "expired":
+        if status == "expired":
 
             print(
                 "⏰ PAGAMENTO EXPIRADO"
@@ -1126,7 +1127,6 @@ async def mercadopago_webhook(
                 "order_id",
                 order_id
             ).execute()
-
         return PlainTextResponse(
             "OK"
         )
