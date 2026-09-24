@@ -225,28 +225,32 @@ else:
         "aviso_expiracao_enviado": False,
         "criado_em": agora.isoformat(),
         "atualizado_em": agora.isoformat()
-       }).eq("telegram_user_id", telegram_user_id).eq("client_id", client_id).execute()
+    }).eq("telegram_user_id", telegram_user_id).eq("client_id", client_id).execute()
 
     print(f"🔄 ACESSO RENOVADO: {telegram_user_id}")
 
 else:
- 
-        + timedelta(days=dias_acesso)
-    )
+    nova_expiracao = agora + timedelta(days=dias_acesso)
 
     supabase.table("access_control").insert({
         "telegram_user_id": telegram_user_id,
-        "payment_id": payment_id,
         "client_id": client_id,
+        "payment_id": payment_id,
         "data_inicio": agora.isoformat(),
         "data_expiracao": nova_expiracao.isoformat(),
-        "status": "ativo"
+        "status": "ativo",
+        "aviso_10_enviado": False,
+        "aviso_5_enviado": False,
+        "aviso_3_enviado": False,
+        "aviso_2_enviado": False,
+        "aviso_1_enviado": False,
+        "aviso_expiracao_enviado": False,
+        "criado_em": agora.isoformat(),
+        "atualizado_em": agora.isoformat()
     }).execute()
 
-    print(
-        f"🆕 ACESSO CRIADO: "
-        f"{telegram_user_id}"
-    )
+    print(f"🆕 ACESSO CRIADO: {telegram_user_id}")
+
 
 async def get_telegram_app():
     global telegram_app, _initialized
