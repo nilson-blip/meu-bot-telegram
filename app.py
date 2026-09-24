@@ -182,7 +182,7 @@ existente = (
 
 agora = datetime.now(timezone.utc)
 
-        if existente:
+if existente:
         acesso = existente[0]
         expiracao_atual = datetime.fromisoformat(
             acesso["data_expiracao"].replace("Z", "+00:00")
