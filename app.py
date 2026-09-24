@@ -182,7 +182,7 @@ existente = (
 
 agora = datetime.now(timezone.utc)
 
-if existente:
+    if existente:
         acesso = existente[0]
         expiracao_atual = datetime.fromisoformat(
             acesso["data_expiracao"].replace("Z", "+00:00")
@@ -211,6 +211,7 @@ if existente:
 
     else:
         nova_expiracao = agora + timedelta(days=dias_acesso)
+
 
         supabase.table("access_control").insert({
             "telegram_user_id": telegram_user_id,
