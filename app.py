@@ -274,12 +274,13 @@ else:
         "aviso_expiracao_enviado": False,
         "criado_em": agora.isoformat(),
         "atualizado_em": agora.isoformat()
-    }).execute()
+     }).execute()
 
-    print(f"🆕 ACESSO CRIADO: {telegram_user_id}")
+        print(f"🆕 ACESSO CRIADO: {telegram_user_id}")
 
 
 async def get_telegram_app():
+
     global telegram_app, _initialized
 
     if telegram_app is None:
