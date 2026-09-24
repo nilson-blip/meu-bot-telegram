@@ -211,7 +211,7 @@ if existente:
 else:
           nova_expiracao = agora + timedelta(days=dias_acesso)
         
-        supabase.table("access_control").insert({
+supabase.table("access_control").insert({
             "telegram_user_id": telegram_user_id,
             "client_id": client_id,
             "payment_id": payment_id,
