@@ -98,7 +98,7 @@ async def verificar_remarketing():
         print("🔎 NENHUM PAGAMENTO PENDENTE PARA REMARKETING.")
         return
         
-        telegram = await get_telegram_app()
+    telegram = await get_telegram_app()
     for pagamento in pagamentos.data:
         try:
         criado_em = datetime.fromisoformat(
