@@ -180,8 +180,9 @@ existente = (
     .execute()
 )
 
-    if existente.data:
+    if existente and existente.data:
     acesso = existente.data[0]
+
 
     expiracao_atual = datetime.fromisoformat(
         acesso["data_expiracao"].replace("Z", "+00:00")
