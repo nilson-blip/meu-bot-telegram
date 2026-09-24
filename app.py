@@ -242,7 +242,7 @@ supabase.table("access_control").update({
     }).eq("telegram_user_id", telegram_user_id).eq("client_id", client_id).execute()
     
 
-        print(f"🆕 ACESSO CRIADO: {telegram_user_id}")
+print(f"🆕 ACESSO CRIADO: {telegram_user_id}")
 
     elif acesso_existente:
         nova_expiracao = max(
