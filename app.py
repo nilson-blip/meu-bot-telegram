@@ -1081,7 +1081,7 @@ async def mercadopago_webhook(
         )
 
     
-        if status == "failed":
+        elif status == "failed":
 
             print(
                 "❌ PAGAMENTO FALHOU"
@@ -1096,7 +1096,7 @@ async def mercadopago_webhook(
                 order_id
             ).execute()
 
-        if status == "refunded":
+        elif status == "refunded":
 
             print(
                 "↩️ PAGAMENTO ESTORNADO"
@@ -1111,7 +1111,7 @@ async def mercadopago_webhook(
                 order_id
             ).execute()
 
-        if status == "expired":
+        elif status == "expired":
 
             print(
                 "⏰ PAGAMENTO EXPIRADO"
