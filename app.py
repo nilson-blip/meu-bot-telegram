@@ -209,7 +209,7 @@ if existente:
 
         print(f"🔄 ACESSO RENOVADO: {telegram_user_id}")
 
-else:
+    else:
         nova_expiracao = agora + timedelta(days=dias_acesso)
 
 
