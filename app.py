@@ -100,7 +100,7 @@ async def verificar_remarketing():
         
         telegram = await get_telegram_app()
 
-        for pagamento in pagamentos.data:
+    for pagamento in pagamentos.data:
     try:
         criado_em = datetime.fromisoformat(
             pagamento["created_at"].replace("Z", "+00:00")
