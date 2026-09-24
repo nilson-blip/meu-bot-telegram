@@ -86,25 +86,25 @@ async def verificar_remarketing():
     supabase = get_supabase()
     agora = datetime.now(timezone.utc)
 
-pagamentos = (
-    supabase.table("payments")
-    .select("*")
-    .eq("status", "pending")
-    .eq("remarketing_enviado", False)
-    .execute()
-)
+    pagamentos = (
+        supabase.table("payments")
+        .select("*")
+        .eq("status", "pending")
+        .eq("remarketing_enviado", False)
+        .execute()
+    )
 
-if not pagamentos.data:
-    print("🔎 NENHUM PAGAMENTO PENDENTE PARA REMARKETING.")
-    return
+    if not pagamentos.data:
+        print("🔎 NENHUM PAGAMENTO PENDENTE PARA REMARKETING.")
+        return
 
-telegram = await get_telegram_app()
+    telegram = await get_telegram_app()
 
-for pagamento in pagamentos.data:
-    try:
-        criado_em = datetime.fromisoformat(
-            pagamento["created_at"].replace("Z", "+00:00")
-        )
+    for pagamento in pagamentos.data:
+        try:
+            criado_em = datetime.fromisoformat(
+                pagamento["created_at"].replace("Z", "+00:00")
+            )
 
         minutos_passados = (
             agora - criado_em
