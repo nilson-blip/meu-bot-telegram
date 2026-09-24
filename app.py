@@ -181,7 +181,7 @@ existente = (
 )
 
     if existente and existente.data:
-    acesso = existente.data[0]
+        acesso = existente.data[0]
 
 
     expiracao_atual = datetime.fromisoformat(
