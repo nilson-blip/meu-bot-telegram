@@ -161,10 +161,10 @@ async def verificar_remarketing():
         )
 
         except Exception as erro:
-            print(
-                f"❌ ERRO NO REMARKETING: "
-                f"{pagamento.get('id')}: {erro}"
-            )
+        print(
+            f"❌ ERRO NO REMARKETING: "
+            f"{pagamento.get('id')}: {erro}"
+       )
 
 async def registrar_acesso(telegram_user_id, payment_id):
     supabase = get_supabase()
