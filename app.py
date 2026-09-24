@@ -191,8 +191,8 @@ if existente:
         if expiracao_atual > agora:
             nova_expiracao = expiracao_atual + timedelta(days=dias_acesso)
         else:
-            nova_expiracao = agora + timedelta(days=dias_acesso)
-
+            nova_expiracao = agora + 
+timedelta(days=dias_acesso)
         supabase.table("access_control").update({
             "payment_id": payment_id,
             "data_inicio": agora.isoformat(),
@@ -208,10 +208,11 @@ if existente:
         }).eq("telegram_user_id", telegram_user_id).eq("client_id", client_id).execute()
 
         print(f"🔄 ACESSO RENOVADO: {telegram_user_id}")
-else:
-          nova_expiracao = agora + timedelta(days=dias_acesso)
-        
-supabase.table("access_control").insert({
+
+    else:
+        nova_expiracao = agora + timedelta(days=dias_acesso)
+
+        supabase.table("access_control").insert({
             "telegram_user_id": telegram_user_id,
             "client_id": client_id,
             "payment_id": payment_id,
@@ -228,8 +229,7 @@ supabase.table("access_control").insert({
             "atualizado_em": agora.isoformat()
         }).execute()
 
-
-print(f"🆕 ACESSO CRIADO: {telegram_user_id}")
+        print(f"🆕 ACESSO CRIADO: {telegram_user_id}")
 
 supabase.table("access_control").update({
         "aviso_10_enviado": False,
