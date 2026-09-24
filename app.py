@@ -160,7 +160,6 @@ async def registrar_acesso(telegram_user_id, payment_id):
         .select("dias_acesso, client_id")
         .eq("id", payment_id)
         .single()
-
         .execute()
     )
 
@@ -170,19 +169,17 @@ async def registrar_acesso(telegram_user_id, payment_id):
     dias_acesso = pagamento.data["dias_acesso"]
     client_id = pagamento.data["client_id"]
 
-agora = datetime.now(timezone.utc)
+    agora = datetime.now(timezone.utc)
 
-existente = (
-    supabase.table("access_control")
-    .select("*")
-    .eq("telegram_user_id", telegram_user_id)
-    .eq("client_id", client_id)
-    .execute()
-).data
+    existente = (
+        supabase.table("access_control")
+        .select("*")
+        .eq("telegram_user_id", telegram_user_id)
+        .eq("client_id", client_id)
+        .execute()
+    ).data
 
-agora = datetime.now(timezone.utc)
-
-if existente:
+    if existente:
         acesso = existente[0]
         expiracao_atual = datetime.fromisoformat(
             acesso["data_expiracao"].replace("Z", "+00:00")
@@ -192,6 +189,7 @@ if existente:
             nova_expiracao = expiracao_atual + timedelta(days=dias_acesso)
         else:
             nova_expiracao = agora + timedelta(days=dias_acesso)
+
         supabase.table("access_control").update({
             "payment_id": payment_id,
             "data_inicio": agora.isoformat(),
@@ -204,13 +202,16 @@ if existente:
             "aviso_1_enviado": False,
             "aviso_expiracao_enviado": False,
             "atualizado_em": agora.isoformat()
-        }).eq("telegram_user_id", telegram_user_id).eq("client_id", client_id).execute()
+        }).eq(
+            "telegram_user_id", telegram_user_id
+        ).eq(
+            "client_id", client_id
+        ).execute()
 
         print(f"🔄 ACESSO RENOVADO: {telegram_user_id}")
 
-
-else:
-    nova_expiracao = agora + timedelta(days=dias_acesso)
+    else:
+        nova_expiracao = agora + timedelta(days=dias_acesso)
 
         supabase.table("access_control").insert({
             "telegram_user_id": telegram_user_id,
