@@ -146,18 +146,20 @@ async def verificar_remarketing():
             reply_markup=InlineKeyboardMarkup(
                 botoes_remarketing
             ),
-        )
+        )       
         
-            supabase.table("payments").update({
-                "remarketing_enviado": True
-            }).eq(
-                "id",
-                pagamento["id"]
-            ).execute()
+        supabase.table("payments").update({
+            "remarketing_enviado": True
+        }).eq(
+            "id",
+            pagamento["id"]
+        ).execute()
 
-            print(
-                f"📲 REMARKETING ENVIADO: "
-                f"{telegram_user_id}"
+        print(
+            f"📲 REMARKETING ENVIADO: "
+            f"{telegram_user_id}"
+        )
+
             )
         except Exception as erro:
             print(
