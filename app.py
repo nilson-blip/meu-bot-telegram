@@ -147,7 +147,8 @@ async def verificar_remarketing():
                 botoes_remarketing
             ),
         )
-            supabase.table("payments").update({
+            
+        supabase.table("payments").update({
                 "remarketing_enviado": True
             }).eq(
                 "id",
