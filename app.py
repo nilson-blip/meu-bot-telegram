@@ -160,7 +160,7 @@ async def verificar_remarketing():
             f"{telegram_user_id}"
         )
 
-            )
+            
         except Exception as erro:
             print(
                 f"❌ ERRO NO REMARKETING: "
