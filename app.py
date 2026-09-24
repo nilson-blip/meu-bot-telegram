@@ -53,36 +53,34 @@ async def registrar_bot(client_id):
         f"{bot_info.id} | @{bot_info.username}"
     )
 
+    existente = (
+        supabase.table("telegram_bots")
+        .select("id")
+        .eq("bot_id", bot_info.id)
+        .limit(1)
+        .execute()
+    )
 
+    if existente.data:
+        print("ℹ️ BOT JÁ ESTÁ REGISTRADO.")
+        return existente.data[0]["id"]
 
-existente = (
-    supabase.table("telegram_bots")
-    .select("id")
-    .eq("bot_id", bot_info.id)
-    .limit(1)
-    .execute()
-)
+    resultado = (
+        supabase.table("telegram_bots")
+        .insert({
+            "client_id": client_id,
+            "bot_id": bot_info.id,
+            "username": bot_info.username,
+            "bot_name": bot_info.first_name,
+            "bot_token": os.getenv("BOT_TOKEN"),
+            "status": "active"
+        })
+        .execute()
+    )
 
-if existente.data:
-    print("ℹ️ BOT JÁ ESTÁ REGISTRADO.")
-    return existente.data[0]["id"]
+    print("🤖 BOT REGISTRADO NO SUPABASE.")
 
-resultado = (
-    supabase.table("telegram_bots")
-    .insert({
-        "client_id": client_id,
-        "bot_id": bot_info.id,
-        "username": bot_info.username,
-        "bot_name": bot_info.first_name,
-        "bot_token": os.getenv("BOT_TOKEN"),
-        "status": "active"
-    })
-    .execute()
-)
-
-print("🤖 BOT REGISTRADO NO SUPABASE.")
-
-return resultado.data[0]["id"]
+    return resultado.data[0]["id"]
 
 async def verificar_remarketing():
     supabase = get_supabase()
