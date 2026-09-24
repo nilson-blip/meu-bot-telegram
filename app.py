@@ -210,9 +210,8 @@ if existente:
         print(f"🔄 ACESSO RENOVADO: {telegram_user_id}")
 
     else:
-        nova_expiracao = agora + timedelta(days=dias_acesso)
-
-
+          nova_expiracao = agora + timedelta(days=dias_acesso)
+        
         supabase.table("access_control").insert({
             "telegram_user_id": telegram_user_id,
             "client_id": client_id,
@@ -245,8 +244,8 @@ if existente:
     
 print(f"🔄 ACESSO RENOVADO: {telegram_user_id}")
 
-else:
-    nova_expiracao = agora + timedelta(days=dias_acesso)
+  else:
+      nova_expiracao = agora + timedelta(days=dias_acesso)
 
     supabase.table("access_control").insert({
         "telegram_user_id": telegram_user_id,
