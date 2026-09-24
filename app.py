@@ -163,8 +163,8 @@ async def verificar_remarketing():
             
         except Exception as erro:
         print(
-                f"❌ ERRO NO REMARKETING: "
-                f"{pagamento.get('id')}: {erro}"
+             f"❌ ERRO NO REMARKETING: "
+             f"{pagamento.get('id')}: {erro}"
             )
 
 
