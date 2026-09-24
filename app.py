@@ -230,79 +230,6 @@ async def registrar_acesso(telegram_user_id, payment_id):
             "atualizado_em": agora.isoformat()
         }).execute()
 
-        print(f"🆕 ACESSO CRIADO: {telegram_user_id}")
-
-supabase.table("access_control").update({
-        "aviso_10_enviado": False,
-        "aviso_5_enviado": False,
-        "aviso_3_enviado": False,
-        "aviso_2_enviado": False,
-        "aviso_1_enviado": False,
-        "aviso_expiracao_enviado": False,
-        "atualizado_em": agora.isoformat()
-    }).eq("telegram_user_id", telegram_user_id).eq("client_id", client_id).execute()
-    
-
-print(f"🆕 ACESSO CRIADO: {telegram_user_id}")
-
-    elif: acesso_existente:
-        nova_expiracao = max(
-            datetime.fromisoformat(acesso_existente["data_expiracao"]),
-            agora
-        ) + timedelta(days=dias_acesso)
-
-        supabase.table("access_control").update({
-            "data_expiracao": nova_expiracao.isoformat(),
-            "status": "ativo",
-            "aviso_10_enviado": False,
-            "aviso_5_enviado": False,
-            "aviso_3_enviado": False,
-            "aviso_2_enviado": False,
-            "aviso_1_enviado": False,
-            "aviso_expiracao_enviado": False,
-            "atualizado_em": agora.isoformat()
-        }).eq(
-            "telegram_user_id", telegram_user_id
-        ).eq(
-            "client_id", client_id
-        ).execute()
-
-        print(f"🔄 ACESSO RENOVADO: {telegram_user_id}")
-
-    else:
-        nova_expiracao = agora + timedelta(days=dias_acesso)
-
-        supabase.table("access_control").insert({
-            "telegram_user_id": telegram_user_id,
-            "client_id": client_id,
-            "payment_id": payment_id,
-            "data_inicio": agora.isoformat(),
-            "data_expiracao": nova_expiracao.isoformat(),
-            "status": "ativo",
-            "aviso_10_enviado": False,
-            "aviso_5_enviado": False,
-            "aviso_3_enviado": False,
-            "aviso_2_enviado": False,
-            "aviso_1_enviado": False,
-            "aviso_expiracao_enviado": False,
-            "criado_em": agora.isoformat(),
-            "atualizado_em": agora.isoformat()
-        }).execute()
-
-        print(f"🆕 ACESSO CRIADO: {telegram_user_id}")
-        "data_expiracao": nova_expiracao.isoformat(),
-        "status": "ativo",
-        "aviso_10_enviado": False,
-        "aviso_5_enviado": False,
-        "aviso_3_enviado": False,
-        "aviso_2_enviado": False,
-        "aviso_1_enviado": False,
-        "aviso_expiracao_enviado": False,
-        "criado_em": agora.isoformat(),
-        "atualizado_em": agora.isoformat()
-     }).execute()
-
-        print(f"🆕 ACESSO CRIADO: {telegram_user_id}")
 
 
 async def get_telegram_app():
@@ -340,6 +267,7 @@ if not _initialized:
 
 return telegram_app
 
+
 async def start(update: Update, context):
     botoes = [
         [
@@ -366,6 +294,7 @@ await update.message.reply_text(
     "🤖 Olá! Bem-vindo!\n\nEscolha uma opção!👇",
     reply_markup=InlineKeyboardMarkup(botoes),
 )
+
 
 async def botoes(update: Update, context):
     query = update.callback_query
