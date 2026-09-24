@@ -97,30 +97,29 @@ async def verificar_remarketing():
     if not pagamentos.data:
         print("🔎 NENHUM PAGAMENTO PENDENTE PARA REMARKETING.")
         return
-
-    telegram = await get_telegram_app()
-
-    for pagamento in pagamentos.data:
+        
+        telegram = await get_telegram_app()
+        for pagamento in pagamentos.data:
         try:
             criado_em = datetime.fromisoformat(
                 pagamento["created_at"].replace("Z", "+00:00")
             )
 
-        minutos_passados = (
-            agora - criado_em
-        ).total_seconds() / 60
+            minutos_passados = (
+                agora - criado_em
+            ).total_seconds() / 60
 
-        if minutos_passados < 5:
-            continue
+            if minutos_passados < 5:
+                continue
 
-        telegram_user_id = pagamento["telegram_user_id"]
-        payment_url = pagamento.get("payment_url")
+            telegram_user_id = pagamento["telegram_user_id"]
+            payment_url = pagamento.get("payment_url")
 
-        if not payment_url:
-            print(
-                f"⚠️ PAGAMENTO SEM LINK: "
-                f"{pagamento['id']}"
-            )
+            if not payment_url:
+                print(
+                    f"⚠️ PAGAMENTO SEM LINK: "
+                    f"{pagamento['id']}"
+                )
             continue
 
         botoes_remarketing = [
