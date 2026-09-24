@@ -191,8 +191,7 @@ if existente:
         if expiracao_atual > agora:
             nova_expiracao = expiracao_atual + timedelta(days=dias_acesso)
         else:
-            nova_expiracao = agora + 
-timedelta(days=dias_acesso)
+            nova_expiracao = agora + timedelta(days=dias_acesso)
         supabase.table("access_control").update({
             "payment_id": payment_id,
             "data_inicio": agora.isoformat(),
