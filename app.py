@@ -242,8 +242,8 @@ else:
         "aviso_expiracao_enviado": False,
         "atualizado_em": agora.isoformat()
     }).eq("telegram_user_id", telegram_user_id).eq("client_id", client_id).execute()
-
-       print(f"🔄 ACESSO RENOVADO: {telegram_user_id}")
+    
+print(f"🔄 ACESSO RENOVADO: {telegram_user_id}")
 
 else:
     nova_expiracao = agora + timedelta(days=dias_acesso)
