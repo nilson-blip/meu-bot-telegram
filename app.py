@@ -154,8 +154,8 @@ async def verificar_remarketing():
                 "id",
                 pagamento["id"]
             ).execute()
-
-            print(
+        
+        print(
                 f"📲 REMARKETING ENVIADO: "
                 f"{telegram_user_id}"
             )
