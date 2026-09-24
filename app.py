@@ -244,7 +244,7 @@ supabase.table("access_control").update({
 
 print(f"🆕 ACESSO CRIADO: {telegram_user_id}")
 
-elif acesso_existente:
+    elif acesso_existente:
         nova_expiracao = max(
             datetime.fromisoformat(acesso_existente["data_expiracao"]),
             agora
