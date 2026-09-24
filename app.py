@@ -182,52 +182,55 @@ existente = (
 
 agora = datetime.now(timezone.utc)
 
-if existente:
-    acesso = existente[0]
-    expiracao_atual = datetime.fromisoformat(
-        acesso["data_expiracao"].replace("Z", "+00:00")
-    )
-
-    if expiracao_atual > agora:
-        nova_expiracao = expiracao_atual + timedelta(days=dias_acesso)
-    else:
-        nova_expiracao = agora + timedelta(days=dias_acesso)
-
-    supabase.table("access_control").update({
-        "payment_id": payment_id,
-        "data_inicio": agora.isoformat(),
-        "data_expiracao": nova_expiracao.isoformat(),
-        "status": "ativo",
-        "aviso_10_enviado": False,
-        "aviso_5_enviado": False,
-        "aviso_3_enviado": False,
-        "aviso_2_enviado": False,
-        "aviso_1_enviado": False,
-        "aviso_expiracao_enviado": False,
-        "atualizado_em": agora.isoformat()
-    }).eq("telegram_user_id", telegram_user_id).eq("client_id", client_id).execute()
-
-    print(f"🔄 ACESSO RENOVADO: {telegram_user_id}")
-
-else:
-    nova_expiracao = agora + timedelta(days=dias_acesso)
-
     if existente:
-    acesso = existente[0]
-    expiracao_atual = datetime.fromisoformat(
-        acesso["data_expiracao"].replace("Z", "+00:00")
-    )
+        acesso = existente[0]
+        expiracao_atual = datetime.fromisoformat(
+            acesso["data_expiracao"].replace("Z", "+00:00")
+        )
 
-    if expiracao_atual > agora:
-        nova_expiracao = expiracao_atual + timedelta(days=dias_acesso)
+        if expiracao_atual > agora:
+            nova_expiracao = expiracao_atual + timedelta(days=dias_acesso)
+        else:
+            nova_expiracao = agora + timedelta(days=dias_acesso)
+
+        supabase.table("access_control").update({
+            "payment_id": payment_id,
+            "data_inicio": agora.isoformat(),
+            "data_expiracao": nova_expiracao.isoformat(),
+            "status": "ativo",
+            "aviso_10_enviado": False,
+            "aviso_5_enviado": False,
+            "aviso_3_enviado": False,
+            "aviso_2_enviado": False,
+            "aviso_1_enviado": False,
+            "aviso_expiracao_enviado": False,
+            "atualizado_em": agora.isoformat()
+        }).eq("telegram_user_id", telegram_user_id).eq("client_id", client_id).execute()
+
+        print(f"🔄 ACESSO RENOVADO: {telegram_user_id}")
+
     else:
         nova_expiracao = agora + timedelta(days=dias_acesso)
 
-    supabase.table("access_control").update({
-        "payment_id": payment_id,
-        "data_inicio": agora.isoformat(),
-        "data_expiracao": nova_expiracao.isoformat(),
-        "status": "ativo",
+        supabase.table("access_control").insert({
+            "telegram_user_id": telegram_user_id,
+            "client_id": client_id,
+            "payment_id": payment_id,
+            "data_inicio": agora.isoformat(),
+            "data_expiracao": nova_expiracao.isoformat(),
+            "status": "ativo",
+            "aviso_10_enviado": False,
+            "aviso_5_enviado": False,
+            "aviso_3_enviado": False,
+            "aviso_2_enviado": False,
+            "aviso_1_enviado": False,
+            "aviso_expiracao_enviado": False,
+            "criado_em": agora.isoformat(),
+            "atualizado_em": agora.isoformat()
+        }).execute()
+
+        print(f"🆕 ACESSO CRIADO: {telegram_user_id}")
+
         "aviso_10_enviado": False,
         "aviso_5_enviado": False,
         "aviso_3_enviado": False,
