@@ -160,12 +160,11 @@ async def verificar_remarketing():
             f"{telegram_user_id}"
         )
 
-    except Exception as erro:
-        print(
-            f"❌ ERRO NO REMARKETING: "
-            f"{pagamento.get('id')}: {erro}"
-        
-        )
+        except Exception as erro:
+            print(
+                f"❌ ERRO NO REMARKETING: "
+                f"{pagamento.get('id')}: {erro}"
+            )
 
 async def registrar_acesso(telegram_user_id, payment_id):
     supabase = get_supabase()
@@ -178,11 +177,11 @@ async def registrar_acesso(telegram_user_id, payment_id):
         .execute()
     )
 
-if not pagamento.data:
-    raise RuntimeError("Pagamento não encontrado.")
+    if not pagamento.data:
+        raise RuntimeError("Pagamento não encontrado.")
 
-dias_acesso = pagamento.data["dias_acesso"]
-client_id = pagamento.data["client_id"]
+    dias_acesso = pagamento.data["dias_acesso"]
+    client_id = pagamento.data["client_id"]
 
 agora = datetime.now(timezone.utc)
 
