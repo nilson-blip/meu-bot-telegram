@@ -147,23 +147,23 @@ async def verificar_remarketing():
                 botoes_remarketing
             ),
         )
+            supabase.table("payments").update({
+                "remarketing_enviado": True
+            }).eq(
+                "id",
+                pagamento["id"]
+            ).execute()
 
-        supabase.table("payments").update({
-            "remarketing_enviado": True
-        }).eq(
-            "id",
-            pagamento["id"]
-        ).execute()
+            print(
+                f"📲 REMARKETING ENVIADO: "
+                f"{telegram_user_id}"
+            )
+        except Exception as erro:
+            print(
+                f"❌ ERRO NO REMARKETING: "
+                f"{pagamento.get('id')}: {erro}"
+            )
 
-        print(
-            f"🎣 REMARKETING ENVIADO: "
-            f"{telegram_user_id}"
-        )
-    except Exception as erro:
-        print(
-            f"❌ ERRO NO REMARKETING: "
-            f"{pagamento.get('id')}: {erro}"
-       )
 
 async def registrar_acesso(telegram_user_id, payment_id):
     supabase = get_supabase()
@@ -173,6 +173,7 @@ async def registrar_acesso(telegram_user_id, payment_id):
         .select("dias_acesso, client_id")
         .eq("id", payment_id)
         .single()
+
         .execute()
     )
 
