@@ -225,10 +225,8 @@ else:
         "aviso_expiracao_enviado": False,
         "criado_em": agora.isoformat(),
         "atualizado_em": agora.isoformat()
-    }).execute()
-
-        client_id
-    ).execute()
+    
+    }).eq("telegram_user_id", telegram_user_id).eq("client_id", client_id).execute()
 
     print(
         f"🔄 ACESSO RENOVADO: "
