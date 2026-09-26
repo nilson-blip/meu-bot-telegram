@@ -33,7 +33,6 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 MP_WEBHOOK_SECRET = os.getenv("MERCADOPAGO_WEBHOOK_SECRET")
 
 faltando = []
-
 if not SUPABASE_URL:
     faltando.append("SUPABASE_URL")
 
