@@ -32,8 +32,24 @@ MP_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 MP_WEBHOOK_SECRET = os.getenv("MERCADOPAGO_WEBHOOK_SECRET")
 
-if not all([SUPABASE_URL, SUPABASE_KEY, MP_TOKEN, BOT_TOKEN]):
-    raise RuntimeError("Variáveis de ambiente obrigatórias não configuradas.")
+faltando = []
+
+if not SUPABASE_URL:
+    faltando.append("SUPABASE_URL")
+
+if not SUPABASE_KEY:
+    faltando.append("SUPABASE_SECRET_KEY")
+
+if not MP_TOKEN:
+    faltando.append("MERCADOPAGO_ACCESS_TOKEN")
+
+if not BOT_TOKEN:
+    faltando.append("BOT_TOKEN")
+
+if faltando:
+    raise RuntimeError(
+        "Variáveis ausentes: " + ", ".join(faltando)
+    )
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 telegram_app: Application = Application.builder().token(BOT_TOKEN).updater(None).build()
