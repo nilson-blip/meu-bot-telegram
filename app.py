@@ -21,6 +21,7 @@ from telegram.ext import (
     CommandHandler,
     CallbackQueryHandler,
 )
+from telegram.error import TelegramError
 
 # ============================================================
 # CONFIGURAÇÕES E CLIENTES GLOBAIS
@@ -64,10 +65,11 @@ async def lifespan(app: FastAPI):
     telegram_app.add_handler(CommandHandler("start", start))
     telegram_app.add_handler(CallbackQueryHandler(botoes))
 
-    # Inicializa a aplicação do Telegram
+    # Inicializa a aplicação e o bot do Telegram no event loop principal
     await telegram_app.initialize()
     await telegram_app.start()
-    print("🤖 Telegram Bot inicializado com sucesso.")
+    await telegram_app.bot.initialize()
+    print("🤖 Telegram Bot e Aplicação inicializados com sucesso.")
     
     yield
     
@@ -131,18 +133,23 @@ async def verificar_remarketing():
         print("🔎 NENHUM PAGAMENTO PENDENTE PARA REMARKETING.")
         return
 
+    print(f"🔎 ENCONTRADOS {len(pagamentos.data)} PAGAMENTOS PENDENTES PARA ANÁLISE.")
+
     for pagamento in pagamentos.data:
         try:
-            criado_em = datetime.fromisoformat(
-                pagamento["created_at"].replace("Z", "+00:00")
-            )
+            created_at_str = pagamento["created_at"].replace("Z", "+00:00")
+            criado_em = datetime.fromisoformat(created_at_str)
+
+            if criado_em.tzinfo is None:
+                criado_em = criado_em.replace(tzinfo=timezone.utc)
 
             minutos_passados = (agora - criado_em).total_seconds() / 60
+            print(f"⏱️ Pagamento ID {pagamento['id']}: {minutos_passados:.2f} minutos passados.")
 
             if minutos_passados < 5:
                 continue
 
-            telegram_user_id = pagamento["telegram_user_id"]
+            telegram_user_id = int(pagamento["telegram_user_id"])
             payment_url = pagamento.get("payment_url")
 
             if not payment_url:
@@ -165,10 +172,16 @@ async def verificar_remarketing():
                 "remarketing_enviado": True
             }).eq("id", pagamento["id"]).execute()
 
-            print(f"📲 REMARKETING ENVIADO: {telegram_user_id}")
+            print(f"📲 REMARKETING ENVIADO COM SUCESSO PARA: {telegram_user_id}")
+
+        except TelegramError as e:
+            print(f"❌ ERRO DO TELEGRAM AO ENVIAR REMARKETING ({pagamento.get('id')}): {e}")
+            supabase.table("payments").update({
+                "remarketing_enviado": True
+            }).eq("id", pagamento["id"]).execute()
 
         except Exception as erro:
-            print(f"❌ ERRO NO REMARKETING: {pagamento.get('id')}: {erro}")
+            print(f"❌ ERRO GERAL NO REMARKETING: {pagamento.get('id')}: {erro}")
 
 
 async def registrar_acesso(telegram_user_id: int, payment_id: str):
