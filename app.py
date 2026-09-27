@@ -20,6 +20,7 @@ from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
+    ConversationHandler,
     ChatMemberHandler,
     MessageHandler,
     filters,
@@ -57,40 +58,19 @@ if faltando:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 telegram_app: Application = Application.builder().token(BOT_TOKEN).updater(None).build()
 
-
-# ============================================================
-# LIFESPAN DA APLICAÇÃO (INICIALIZAÇÃO DO BOT)
-# ============================================================
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Setup handlers do Telegram
-    telegram_app.add_handler(CommandHandler("start", start))
-    telegram_app.add_handler(CommandHandler("configurar", iniciar_configuracao))
-    telegram_app.add_handler(CallbackQueryHandler(botoes))
-    
-    # Handler nativo para capturar quando o bot é adicionado como admin em um Canal/Grupo VIP
-    telegram_app.add_handler(
-        ChatMemberHandler(capturar_novo_canal, ChatMemberHandler.MY_CHAT_MEMBER)
-    )
-
-    # Inicializa a aplicação e o bot do Telegram no event loop principal
-    await telegram_app.initialize()
-    await telegram_app.start()
-    await telegram_app.bot.initialize()
-    print("🤖 Telegram Bot e Aplicação inicializados com sucesso.")
-    
-    yield
-    
-    # Finalização graciosa
-    await telegram_app.stop()
-    await telegram_app.shutdown()
-
-app = FastAPI(lifespan=lifespan)
+# ESTADOS DO CONVERSATION HANDLER (ONBOARDING DO DONO)
+(
+    AGUARDANDO_TOKEN,
+    AGUARDANDO_SAUDACAO,
+    AGUARDANDO_PRODUTO_NOME,
+    AGUARDANDO_VALOR,
+    AGUARDANDO_TEMPO,
+    AGUARDANDO_MIDIA,
+) = range(6)
 
 
 # ============================================================
-# FUNÇÕES AUXILIARES DE NEGÓCIO
+# FUNÇÕES AUXILIARES DE NEGÓCIO E INFRAESTRUTURA
 # ============================================================
 
 async def registrar_bot(client_id: int):
@@ -336,31 +316,187 @@ async def verificar_acessos():
 
 
 # ============================================================
-# HANDLERS DO TELEGRAM (CONFIGURAÇÃO 100% INLINE)
+# FLUXO DE ONBOARDING AUTOMÁTICO DO DONO DO VIP (BOT MESTRE)
 # ============================================================
 
 async def iniciar_configuracao(update: Update, context):
-    """Exibe o menu de configuração usando botão Inline padronizado."""
-    bot_info = await context.bot.get_me()
-    
-    # Link nativo do Telegram para vincular o bot a um canal/grupo em formato Inline
-    link_adicionar = f"https://t.me/{bot_info.username}?startchannel=true&admin=post_messages+add_admins+invite_users"
-
-    botoes_config = [
-        [InlineKeyboardButton("📢 Vincular Canal/Grupo VIP", url=link_adicionar)]
-    ]
+    """Inicia a esteira de onboarding interativo do dono."""
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🚀 Começar Configuração", callback_data="iniciar_onboarding")]
+    ])
 
     await update.message.reply_text(
-        "⚙️ **Painel de Configuração**\n\n"
-        "Clique no botão abaixo para adicionar este bot como Administrador do seu Canal ou Grupo VIP:\n\n"
-        "*(O bot irá identificar o grupo automaticamente assim que for adicionado)*",
-        reply_markup=InlineKeyboardMarkup(botoes_config),
+        "👋 **Olá, seja bem-vindo!**\n\n"
+        "Vamos configurar seu bot de vendas VIP em poucos minutos!\n"
+        "Clique no botão abaixo para começar.",
+        reply_markup=keyboard,
         parse_mode="Markdown"
     )
+    return AGUARDANDO_TOKEN
+
+
+async def solicitar_bot_token(update: Update, context):
+    query = update.callback_query
+    await query.answer()
+
+    await query.message.reply_text(
+        "🤖 **Passo 1 de 6: Bot Token**\n\n"
+        "Por favor, forneça o **Bot Token** do seu bot do Telegram (criado no @BotFather):",
+        parse_mode="Markdown"
+    )
+    return AGUARDANDO_TOKEN
+
+
+async def receber_bot_token(update: Update, context):
+    bot_token = update.message.text.strip()
+    context.user_data["bot_token"] = bot_token
+
+    client_id_mp = os.getenv("MERCADOPAGO_CLIENT_ID", "SEU_CLIENT_ID")
+    redirect_uri = f"{os.getenv('RAILWAY_STATIC_URL', 'https://sua-app.up.railway.app')}/oauth/callback"
+    
+    link_mp = (
+        f"https://auth.mercadopago.com.br/authorization"
+        f"?client_id={client_id_mp}&response_type=code&platform_id=mp&redirect_uri={redirect_uri}"
+    )
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("💳 Autorizar Mercado Pago", url=link_mp)],
+        [InlineKeyboardButton("✅ Já autorizei, continuar", callback_data="mp_autorizado")]
+    ])
+
+    await update.message.reply_text(
+        "✅ Token registrado com sucesso!\n\n"
+        "💳 **Passo 2 de 6: Conectar Pagamentos**\n\n"
+        "Entre no Mercado Pago pelo botão abaixo e autorize o bot a processar suas vendas:",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    return AGUARDANDO_SAUDACAO
+
+
+async def solicitar_saudacao(update: Update, context):
+    query = update.callback_query
+    await query.answer()
+
+    await query.message.reply_text(
+        "💬 **Passo 3 de 6: Mensagem de Saudação**\n\n"
+        "Escreva a mensagem de boas-vindas que os seus clientes vão receber ao dar `/start` no seu bot:",
+        parse_mode="Markdown"
+    )
+    return AGUARDANDO_PRODUTO_NOME
+
+
+async def receber_saudacao(update: Update, context):
+    context.user_data["saudacao"] = update.message.text.strip()
+
+    await update.message.reply_text(
+        "📦 **Passo 4 de 6: Apresentação do Produto**\n\n"
+        "Digite o **nome e a descrição** do seu acesso VIP:",
+        parse_mode="Markdown"
+    )
+    return AGUARDANDO_VALOR
+
+
+async def receber_produto_nome(update: Update, context):
+    context.user_data["produto_nome"] = update.message.text.strip()
+
+    await update.message.reply_text(
+        "💰 **Passo 5 de 6: Valor do Acesso**\n\n"
+        "Digite o valor do seu produto (Exemplo: `49.90`):",
+        parse_mode="Markdown"
+    )
+    return AGUARDANDO_TEMPO
+
+
+async def receber_valor(update: Update, context):
+    try:
+        valor = float(update.message.text.replace(",", "."))
+        context.user_data["valor"] = valor
+    except ValueError:
+        await update.message.reply_text("❌ Valor inválido. Digite um número válido ex: 49.90:")
+        return AGUARDANDO_VALOR
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🗓 Semanal (7 dias)", callback_data="tempo_semanal"), InlineKeyboardButton("🗓 Quinzenal (15 dias)", callback_data="tempo_quinzenal")],
+        [InlineKeyboardButton("🗓 Mensal (30 dias)", callback_data="tempo_mensal"), InlineKeyboardButton("♾️ Vitalício", callback_data="tempo_vitalicio")]
+    ])
+
+    await update.message.reply_text(
+        "⏳ **Plano / Duração**\n\n"
+        "Selecione o tempo de validade do plano que aparecerá no botão do cliente:",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    return AGUARDANDO_MIDIA
+
+
+async def receber_tempo(update: Update, context):
+    query = update.callback_query
+    await query.answer()
+
+    tempo_selecionado = query.data.replace("tempo_", "")
+    context.user_data["tempo"] = tempo_selecionado
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⏩ Pular Mídia (Apenas texto)", callback_data="pular_midia")]
+    ])
+
+    await query.message.reply_text(
+        "🖼️ **Passo 6 de 6: Foto ou Vídeo (Opcional)**\n\n"
+        "Envie uma **foto ou vídeo** para ilustrar a oferta ao seu cliente ou clique em pular:",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    return AGUARDANDO_MIDIA
+
+
+async def finalizar_configuracao(update: Update, context):
+    """Salva todas as configurações do dono no Supabase."""
+    media_file_id = None
+    media_type = None
+
+    if update.message:
+        if update.message.photo:
+            media_file_id = update.message.photo[-1].file_id
+            media_type = "photo"
+        elif update.message.video:
+            media_file_id = update.message.video.file_id
+            media_type = "video"
+    elif update.callback_query:
+        await update.callback_query.answer()
+
+    dados = context.user_data
+    dias_map = {"semanal": 7, "quinzenal": 15, "mensal": 30, "vitalicio": 36500}
+    dias_acesso = dias_map.get(dados.get("tempo"), 30)
+
+    client_id = update.effective_user.id
+
+    # Grava/Atualiza o produto no Supabase
+    supabase.table("products").upsert({
+        "client_id": client_id,
+        "title": dados.get("produto_nome"),
+        "greeting_message": dados.get("saudacao"),
+        "price": dados.get("valor"),
+        "duration_type": dados.get("tempo"),
+        "duration_days": dias_acesso,
+        "media_file_id": media_file_id,
+        "media_type": media_type,
+        "status": "active"
+    }).execute()
+
+    await (update.message or update.callback_query.message).reply_text(
+        "🎉 **Configuração Concluída com Sucesso!**\n\n"
+        "Seu bot VIP está 100% configurado, pronto para apresentar mídias, textos e gerar pagamentos em Pix com Split automático!",
+        parse_mode="Markdown"
+    )
+    return ConversationHandler.END
 
 
 async def capturar_novo_canal(update: Update, context):
-    """Detecta automaticamente quando o bot é adicionado ao canal/grupo pelo link inline."""
+    """Captura automaticamente quando o bot é adicionado em um grupo VIP."""
+    if not update.my_chat_member:
+        return
+
     chat = update.my_chat_member.chat
     chat_id_capturado = chat.id
     chat_title = chat.title or "Canal VIP"
@@ -379,7 +515,6 @@ async def capturar_novo_canal(update: Update, context):
     if bot_data.data:
         client_id = bot_data.data[0]["client_id"]
         
-        # Salva o canal automaticamente no Supabase vinculando ao cliente
         supabase.table("vip_groups").upsert({
             "client_id": client_id,
             "chat_id": str(chat_id_capturado),
@@ -387,7 +522,6 @@ async def capturar_novo_canal(update: Update, context):
             "created_at": datetime.now(timezone.utc).isoformat()
         }).execute()
 
-        # Notifica no canal com confirmação
         await context.bot.send_message(
             chat_id=chat_id_capturado,
             text="✅ **Bot configurado com sucesso neste canal!**\n\nAgora estou pronto para gerenciar as vendas e entradas dos membros.",
@@ -396,27 +530,72 @@ async def capturar_novo_canal(update: Update, context):
 
 
 # ============================================================
-# HANDLERS DO TELEGRAM (FLUXO DO COMPRADOR FINAL)
+# FLUXO DO CLIENTE FINAL (COMPRADOR)
 # ============================================================
 
 async def start(update: Update, context):
-    botoes_menu = [
-        [InlineKeyboardButton("🛒 Comprar", callback_data="comprar")],
-        [InlineKeyboardButton("📋 Ver produtos", callback_data="produtos")],
-        [InlineKeyboardButton("❓ Suporte", callback_data="suporte")],
-    ]
+    """Exibe a oferta customizada do dono ao comprador ao dar /start"""
+    bot_username = (await context.bot.get_me()).username
 
-    await update.message.reply_text(
-        "🤖 Olá! Bem-vindo!\n\nEscolha uma opção!👇",
-        reply_markup=InlineKeyboardMarkup(botoes_menu),
+    bot_data = (
+        supabase.table("telegram_bots")
+        .select("client_id")
+        .eq("username", bot_username)
+        .limit(1)
+        .execute()
     )
+
+    if not bot_data.data:
+        await update.message.reply_text("🤖 Bot ainda não configurado pelo administrador.")
+        return
+
+    client_id = bot_data.data[0]["client_id"]
+    
+    produto_resultado = (
+        supabase.table("products")
+        .select("*")
+        .eq("client_id", client_id)
+        .eq("status", "active")
+        .limit(1)
+        .execute()
+    )
+
+    if not produto_resultado.data:
+        await update.message.reply_text("📋 Nenhum plano ativo disponível no momento.")
+        return
+
+    prod = produto_resultado.data[0]
+    saudacao = prod.get("greeting_message", "Seja bem-vindo!")
+    titulo = prod.get("title", "Acesso VIP Exclusivo")
+    preco = float(prod.get("price", 0.0))
+    tempo = str(prod.get("duration_type", "mensal")).capitalize()
+    media_id = prod.get("media_file_id")
+    media_type = prod.get("media_type")
+
+    texto_oferta = (
+        f"{saudacao}\n\n"
+        f"🌟 **{titulo}**\n\n"
+        f"👇 Clique no botão abaixo para liberar seu acesso instantâneo:"
+    )
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(f"⚡ Plano {tempo} - R$ {preco:.2f}", callback_data=f"comprar_{prod['id']}")]
+    ])
+
+    if media_id and media_type == "photo":
+        await update.message.reply_photo(photo=media_id, caption=texto_oferta, reply_markup=keyboard, parse_mode="Markdown")
+    elif media_id and media_type == "video":
+        await update.message.reply_video(video=media_id, caption=texto_oferta, reply_markup=keyboard, parse_mode="Markdown")
+    else:
+        await update.message.reply_text(text=texto_oferta, reply_markup=keyboard, parse_mode="Markdown")
 
 
 async def botoes(update: Update, context):
+    """Gera o Pix via API do Mercado Pago com Split de Comissão"""
     query = update.callback_query
     await query.answer()
 
-    if query.data in ["comprar", "renovar"]:
+    if query.data.startswith("comprar_") or query.data in ["comprar", "renovar"]:
         try:
             bot_username = (await context.bot.get_me()).username
 
@@ -447,7 +626,6 @@ async def botoes(update: Update, context):
                 raise RuntimeError("Nenhuma conexão de pagamento ativa encontrada.")
 
             payment_connection_id = conexao.data[0]["id"]
-            
             client_access_token = conexao.data[0].get("access_token") or MP_TOKEN
             fee_percentage = float(conexao.data[0].get("fee_percentage") or 10.0)
 
@@ -467,9 +645,9 @@ async def botoes(update: Update, context):
             produto_id = produto["id"]
             preco = float(produto["price"])
             dias_acesso = produto["duration_days"]
-            vip_group_id = produto["vip_group_id"]
+            vip_group_id = produto.get("vip_group_id")
 
-            # CALCULA O SPLIT DE PAGAMENTO (DESCONTO NA FONTE)
+            # Cálculo de comissão Split
             application_fee = round(preco * (fee_percentage / 100.0), 2)
 
             headers = {
@@ -534,31 +712,72 @@ async def botoes(update: Update, context):
             await context.bot.send_message(
                 chat_id=query.from_user.id,
                 text=(
-                    "💰 Pix gerado!\n\n"
-                    "👇 Clique abaixo para realizar o pagamento:"
+                    "💰 Pix gerado com sucesso!\n\n"
+                    "👇 Clique no botão abaixo para concluir seu pagamento:"
                 ),
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("💳 Pagar com Pix", url=payment_url)]
+                    [InlineKeyboardButton("💳 Pagar via Pix", url=payment_url)]
                 ])
             )
 
         except Exception as erro:
             print(f"❌ ERRO AO GERAR PAGAMENTO: {erro}")
 
-    elif query.data == "produtos":
-        await query.message.reply_text("📋 Produtos disponíveis.")
 
-    elif query.data == "suporte":
-        await query.message.reply_text("❓ Entre em contato com o suporte.")
+# ============================================================
+# LIFESPAN DA APLICAÇÃO (INICIALIZAÇÃO COMPLETA)
+# ============================================================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Handlers do Onboarding
+    onboarding_handler = ConversationHandler(
+        entry_points=[CommandHandler("configurar", iniciar_configuracao)],
+        states={
+            AGUARDANDO_TOKEN: [
+                CallbackQueryHandler(solicitar_bot_token, pattern="^iniciar_onboarding$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receber_bot_token)
+            ],
+            AGUARDANDO_SAUDACAO: [CallbackQueryHandler(solicitar_saudacao, pattern="^mp_autorizado$")],
+            AGUARDANDO_PRODUTO_NOME: [MessageHandler(filters.TEXT & ~filters.COMMAND, receber_saudacao)],
+            AGUARDANDO_VALOR: [MessageHandler(filters.TEXT & ~filters.COMMAND, receber_produto_nome)],
+            AGUARDANDO_TEMPO: [MessageHandler(filters.TEXT & ~filters.COMMAND, receber_valor)],
+            AGUARDANDO_MIDIA: [
+                CallbackQueryHandler(receber_tempo, pattern="^tempo_"),
+                CallbackQueryHandler(finalizar_configuracao, pattern="^pular_midia$"),
+                MessageHandler(filters.PHOTO | filters.VIDEO, finalizar_configuracao)
+            ],
+        },
+        fallbacks=[CommandHandler("configurar", iniciar_configuracao)]
+    )
+
+    telegram_app.add_handler(onboarding_handler)
+    telegram_app.add_handler(CommandHandler("start", start))
+    telegram_app.add_handler(CallbackQueryHandler(botoes))
+    telegram_app.add_handler(
+        ChatMemberHandler(capturar_novo_canal, ChatMemberHandler.MY_CHAT_MEMBER)
+    )
+
+    await telegram_app.initialize()
+    await telegram_app.start()
+    await telegram_app.bot.initialize()
+    print("🤖 Telegram Bot e Aplicação inicializados com sucesso.")
+    
+    yield
+    
+    await telegram_app.stop()
+    await telegram_app.shutdown()
+
+app = FastAPI(lifespan=lifespan)
 
 
 # ============================================================
-# ENDPOINTS FASTAPI
+# ENDPOINTS FASTAPI (WEBHOOKS E CRONS)
 # ============================================================
 
 @app.get("/")
 async def home():
-    return PlainTextResponse("Bot online!")
+    return PlainTextResponse("Bot Mestre SaaS Online!")
 
 
 @app.get("/registrar-bot")
@@ -622,7 +841,6 @@ async def mercadopago_webhook(request: Request):
         order_id = order_data.get("id")
         data_id = request.query_params.get("data.id") or order_id
 
-        # Validar Assinatura Webhook
         ts = None
         v1 = None
 
@@ -658,7 +876,6 @@ async def mercadopago_webhook(request: Request):
 
         print(f"ORDER RECEBIDA: {order_id}")
 
-        # Consultar Pedido com HTTP Asynchronous Client
         headers = {"Authorization": f"Bearer {MP_TOKEN}"}
         
         async with httpx.AsyncClient() as client:
@@ -765,7 +982,7 @@ async def mercadopago_webhook(request: Request):
                 "invite_enviado": True
             }).eq("order_id", order_id).execute()
 
-            print("🚀 ACESSO VIP ENVIADO!")
+            print("🚀 ACESSO VIP ENVIADO COM SUCESSO!")
 
         elif status in ["failed", "refunded", "expired"]:
             print(f"STATUS DE PAGAMENTO ATUALIZADO: {status}")
