@@ -16,6 +16,7 @@ from telegram import (
     Update,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    ReplyKeyboardRemove,
 )
 from telegram.ext import (
     Application,
@@ -838,6 +839,12 @@ async def start(
     update: Update,
     context,
 ):
+    # Envia sinal explícito para o Telegram remover botões de rodapé/teclado personalizado
+    await update.message.reply_text(
+        "⏳ Carregando menu...",
+        reply_markup=ReplyKeyboardRemove()
+    )
+
     bot_username = (
         await context.bot.get_me()
     ).username
