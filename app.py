@@ -37,7 +37,6 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SECRET_KEY")
 
 # Token principal do Botchê / conta integradora.
-# Mantido como fallback para não quebrar o ambiente atual.
 MP_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -560,7 +559,11 @@ async def receber_bot_token(
         "✅ Token registrado com sucesso!\n\n"
         "💳 **Passo 2 de 6: Conectar Pagamentos**\n\n"
         "Entre no Mercado Pago pelo botão abaixo "
-        "e autorize o bot a processar suas vendas:",
+        "e autorize a integração:\n\n"
+        "ℹ️ **Transparência de Tarifas:**\n"
+        "• **Taxa da plataforma:** 5% por venda processada pelo bot.\n"
+        "• **Tarifa Mercado Pago:** ~0,99% referente à liquidação do Pix.\n\n"
+        "_O valor líquido das suas vendas entra direto na sua conta do Mercado Pago com o desconto automático no momento do repasse._",
         reply_markup=keyboard,
         parse_mode="Markdown",
     )
@@ -942,11 +945,6 @@ async def botoes(
     update: Update,
     context,
 ):
-    """
-    Gera o pagamento usando o access_token OAuth
-    do vendedor e Split via marketplace_fee.
-    """
-
     query = update.callback_query
 
     await query.answer()
@@ -1010,11 +1008,12 @@ async def botoes(
                     "não encontrado."
                 )
 
+            # Taxa da comissão ajustada para 5.0%
             fee_percentage = float(
                 conexao.data[0].get(
                     "fee_percentage"
                 )
-                or 8.0
+                or 5.0
             )
 
             produto_resultado = (
@@ -1056,8 +1055,6 @@ async def botoes(
                 ),
             }
 
-            # Checkout Pro / Orders:
-            # Split usa marketplace_fee.
             order_data = {
                 "type": "online",
                 "total_amount": f"{preco:.2f}",
@@ -1087,7 +1084,7 @@ async def botoes(
                 },
             }
 
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(follow_redirects=True) as client:
                 response = await client.post(
                     "https://api.mercadopago.com/v1/orders",
                     headers=headers,
@@ -1459,24 +1456,12 @@ async def conectar_mercadopago(
 async def oauth_callback(
     request: Request,
 ):
-    code = request.query_params.get(
-        "code"
-    )
-
-    state = request.query_params.get(
-        "state"
-    )
-
-    error = request.query_params.get(
-        "error"
-    )
+    code = request.query_params.get("code")
+    state = request.query_params.get("state")
+    error = request.query_params.get("error")
 
     if error:
-        print(
-            "❌ OAUTH MERCADO PAGO:",
-            error,
-        )
-
+        print("❌ OAUTH MERCADO PAGO:", error)
         return PlainTextResponse(
             f"Autorização cancelada: {error}",
             status_code=400,
@@ -1496,22 +1481,15 @@ async def oauth_callback(
 
     try:
         client_id = int(state)
-
     except ValueError:
         return PlainTextResponse(
             "State OAuth inválido.",
             status_code=400,
         )
 
-    if not MP_CLIENT_ID:
+    if not MP_CLIENT_ID or not MP_CLIENT_SECRET:
         return PlainTextResponse(
-            "MERCADOPAGO_CLIENT_ID não configurado.",
-            status_code=500,
-        )
-
-    if not MP_CLIENT_SECRET:
-        return PlainTextResponse(
-            "MERCADOPAGO_CLIENT_SECRET não configurado.",
+            "MERCADOPAGO_CLIENT_ID ou MERCADOPAGO_CLIENT_SECRET ausente.",
             status_code=500,
         )
 
@@ -1522,74 +1500,48 @@ async def oauth_callback(
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": MP_REDIRECT_URI,
-            "state": state,
         }
 
-        async with httpx.AsyncClient() as client:
+        # Ajuste de robustez no cliente Async HTTPX para evitar problemas com SSL/Proxy e Redirecionamentos no servidor
+        async with httpx.AsyncClient(follow_redirects=True, verify=True) as client:
             response = await client.post(
                 "https://api.mercadopago.com/oauth/token",
                 data=oauth_data,
                 headers={
-                    "accept": "application/json",
-                    "content-type": (
-                        "application/x-www-form-urlencoded"
-                    ),
+                    "Accept": "application/json",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "User-Agent": "Botche-OAuth-Client/1.0",
                 },
-                timeout=20.0,
+                timeout=30.0,
             )
 
-        print(
-            "OAUTH MERCADO PAGO:",
-            response.status_code,
-        )
+        print("OAUTH MERCADO PAGO STATUS:", response.status_code)
 
         if response.status_code != 200:
-            print(
-                "❌ RESPOSTA OAUTH:",
-                response.text,
-            )
-
+            print("❌ RESPOSTA ERRO OAUTH:", response.text)
             return PlainTextResponse(
-                "Erro ao conectar o Mercado Pago. "
-                "Verifique os logs.",
+                f"Erro ao conectar o Mercado Pago ({response.status_code}). "
+                "Verifique os logs do servidor.",
                 status_code=400,
             )
 
         oauth = response.json()
 
-        access_token = oauth.get(
-            "access_token"
-        )
-
-        refresh_token = oauth.get(
-            "refresh_token"
-        )
-
-        public_key = oauth.get(
-            "public_key"
-        )
-
-        mp_user_id = oauth.get(
-            "user_id"
-        )
+        access_token = oauth.get("access_token")
+        refresh_token = oauth.get("refresh_token")
+        public_key = oauth.get("public_key")
+        mp_user_id = oauth.get("user_id")
 
         if not access_token:
-            print(
-                "❌ OAUTH SEM ACCESS TOKEN:",
-                oauth,
-            )
-
+            print("❌ OAUTH SEM ACCESS TOKEN:", oauth)
             return PlainTextResponse(
-                "Mercado Pago não retornou "
-                "Access Token.",
+                "Mercado Pago não retornou Access Token.",
                 status_code=400,
             )
 
-        # Mantém a comissão configurada em 8%.
+        # Atualiza a comissão padrão para 5%
         conexao_existente = (
-            supabase.table(
-                "payment_connections"
-            )
+            supabase.table("payment_connections")
             .select("id, fee_percentage")
             .eq("client_id", client_id)
             .limit(1)
@@ -1601,57 +1553,35 @@ async def oauth_callback(
             "provider": "mercadopago",
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "mp_user_id": (
-                str(mp_user_id)
-                if mp_user_id is not None
-                else None
-            ),
+            "mp_user_id": str(mp_user_id) if mp_user_id is not None else None,
             "public_key": public_key,
-            "fee_percentage": 8,
+            "fee_percentage": 5,
             "status": "active",
         }
 
         if conexao_existente.data:
             (
-                supabase.table(
-                    "payment_connections"
-                )
+                supabase.table("payment_connections")
                 .update({
                     "access_token": access_token,
                     "refresh_token": refresh_token,
-                    "mp_user_id": (
-                        str(mp_user_id)
-                        if mp_user_id is not None
-                        else None
-                    ),
+                    "mp_user_id": str(mp_user_id) if mp_user_id is not None else None,
                     "public_key": public_key,
-                    "fee_percentage": 8,
+                    "fee_percentage": 5,
                     "status": "active",
                 })
-                .eq(
-                    "id",
-                    conexao_existente.data[0]["id"],
-                )
+                .eq("id", conexao_existente.data[0]["id"])
                 .execute()
             )
-
-            connection_id = (
-                conexao_existente.data[0]["id"]
-            )
-
+            connection_id = conexao_existente.data[0]["id"]
         else:
             resultado = (
-                supabase.table(
-                    "payment_connections"
-                )
+                supabase.table("payment_connections")
                 .insert(dados_conexao)
                 .execute()
             )
-
             connection_id = (
-                resultado.data[0]["id"]
-                if resultado.data
-                else None
+                resultado.data[0]["id"] if resultado.data else None
             )
 
         print(
@@ -1663,19 +1593,14 @@ async def oauth_callback(
 
         return PlainTextResponse(
             "✅ Mercado Pago conectado com sucesso!\n\n"
-            "A conta foi vinculada ao Botchê. "
-            "Você já pode fechar esta página."
+            "A conta foi vinculada ao sistema.\n"
+            "Você já pode fechar esta página e retornar ao Telegram."
         )
 
     except Exception as erro:
-        print(
-            "❌ ERRO NO CALLBACK OAUTH: "
-            f"{type(erro).__name__}: {erro}"
-        )
-
+        print(f"❌ ERRO NO CALLBACK OAUTH: {type(erro).__name__}: {erro}")
         return PlainTextResponse(
-            "Erro ao concluir a conexão "
-            "com o Mercado Pago.",
+            f"Erro ao concluir a conexão com o Mercado Pago: {type(erro).__name__}",
             status_code=500,
         )
 
@@ -1738,8 +1663,6 @@ async def mercadopago_webhook(
             data,
         )
 
-        # Eventos como mp-connect não são
-        # eventos de pagamento.
         if data.get("type") != "order":
             return PlainTextResponse("OK")
 
@@ -1823,9 +1746,6 @@ async def mercadopago_webhook(
             f"ORDER RECEBIDA: {order_id}"
         )
 
-        # Primeiro encontramos o pagamento para
-        # descobrir qual conexão OAuth pertence
-        # àquela venda.
         pagamento = (
             supabase.table("payments")
             .select(
@@ -1854,7 +1774,6 @@ async def mercadopago_webhook(
             )
         )
 
-        # Token OAuth do vendedor.
         order_access_token = None
 
         if payment_connection_id:
@@ -1878,9 +1797,6 @@ async def mercadopago_webhook(
                     )
                 )
 
-        # Fallback para preservar o ambiente
-        # antigo enquanto as conexões OAuth
-        # forem sendo migradas.
         order_access_token = (
             order_access_token
             or MP_TOKEN
@@ -1903,7 +1819,7 @@ async def mercadopago_webhook(
             )
         }
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
             response = await client.get(
                 (
                     "https://api.mercadopago.com/"
