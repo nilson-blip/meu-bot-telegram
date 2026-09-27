@@ -15,11 +15,17 @@ from telegram import (
     Update,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    KeyboardButton,
+    KeyboardButtonRequestChat,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
 )
 from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
+    MessageHandler,
+    filters,
 )
 from telegram.error import TelegramError
 
@@ -63,7 +69,13 @@ telegram_app: Application = Application.builder().token(BOT_TOKEN).updater(None)
 async def lifespan(app: FastAPI):
     # Setup handlers do Telegram
     telegram_app.add_handler(CommandHandler("start", start))
+    telegram_app.add_handler(CommandHandler("configurar", iniciar_configuracao))
     telegram_app.add_handler(CallbackQueryHandler(botoes))
+    
+    # Handler nativo para capturar o Canal/Grupo VIP selecionado pelo dono
+    telegram_app.add_handler(
+        MessageHandler(filters.StatusUpdate.CHAT_SHARED, receber_grupo_vip)
+    )
 
     # Inicializa a aplicação e o bot do Telegram no event loop principal
     await telegram_app.initialize()
@@ -327,7 +339,71 @@ async def verificar_acessos():
 
 
 # ============================================================
-# HANDLERS DO TELEGRAM
+# HANDLERS DO TELEGRAM (CONFIGURAÇÃO AUTOMÁTICA DO DONO)
+# ============================================================
+
+async def iniciar_configuracao(update: Update, context):
+    """Comando para o Dono do VIP vincular o canal sem digitar ID técnico."""
+    botao_selecionar = KeyboardButton(
+        text="📢 Selecionar Meu Canal/Grupo VIP",
+        request_chat=KeyboardButtonRequestChat(
+            request_id=1,
+            chat_is_channel=True,
+            bot_is_member=True,
+        )
+    )
+
+    reply_markup = ReplyKeyboardMarkup(
+        [[botao_selecionar]], 
+        one_time_keyboard=True, 
+        resize_keyboard=True
+    )
+
+    await update.message.reply_text(
+        "👋 Vamos configurar seu grupo!\n\n"
+        "Clique no botão abaixo para escolher em qual Canal ou Grupo VIP eu devo gerenciar os acessos:",
+        reply_markup=reply_markup
+    )
+
+
+async def receber_grupo_vip(update: Update, context):
+    """Recebe o chat_id retornado pelo Telegram de forma 100% transparente."""
+    chat_shared = update.message.chat_shared
+    chat_id_capturado = chat_shared.chat_id
+    telegram_user_id = update.effective_user.id
+
+    print(f"🎯 CHAT ID CAPTURADO AUTOMATICAMENTE: {chat_id_capturado}")
+
+    bot_info = await context.bot.get_me()
+    bot_data = (
+        supabase.table("telegram_bots")
+        .select("client_id")
+        .eq("username", bot_info.username)
+        .limit(1)
+        .execute()
+    )
+
+    if bot_data.data:
+        client_id = bot_data.data[0]["client_id"]
+        
+        # Salva o Grupo VIP capturado no Supabase
+        supabase.table("vip_groups").upsert({
+            "client_id": client_id,
+            "chat_id": str(chat_id_capturado),
+            "title": "Canal VIP Vinculado",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }).execute()
+
+    await update.message.reply_text(
+        "✅ **Seu Canal/Grupo VIP foi vinculado com sucesso!**\n\n"
+        "Agora eu já sei para onde enviar os membros que pagarem.",
+        reply_markup=ReplyKeyboardRemove(),
+        parse_mode="Markdown"
+    )
+
+
+# ============================================================
+# HANDLERS DO TELEGRAM (FLUXO DO COMPRADOR FINAL)
 # ============================================================
 
 async def start(update: Update, context):
@@ -367,7 +443,7 @@ async def botoes(update: Update, context):
 
             conexao = (
                 supabase.table("payment_connections")
-                .select("id")
+                .select("id, access_token, fee_percentage")
                 .eq("client_id", client_id)
                 .eq("status", "active")
                 .limit(1)
@@ -378,6 +454,10 @@ async def botoes(update: Update, context):
                 raise RuntimeError("Nenhuma conexão de pagamento ativa encontrada.")
 
             payment_connection_id = conexao.data[0]["id"]
+            
+            # Pega o token do Mercado Pago do Dono do VIP (via OAuth) ou usa o Token Padrão caso não exista
+            client_access_token = conexao.data[0].get("access_token") or MP_TOKEN
+            fee_percentage = float(conexao.data[0].get("fee_percentage") or 10.0)
 
             produto_resultado = (
                 supabase.table("products")
@@ -397,8 +477,11 @@ async def botoes(update: Update, context):
             dias_acesso = produto["duration_days"]
             vip_group_id = produto["vip_group_id"]
 
+            # CALCULA O SPLIT DE PAGAMENTO (DESCONTO NA FONTE)
+            application_fee = round(preco * (fee_percentage / 100.0), 2)
+
             headers = {
-                "Authorization": f"Bearer {MP_TOKEN}",
+                "Authorization": f"Bearer {client_access_token}",
                 "Content-Type": "application/json",
                 "X-Idempotency-Key": str(uuid.uuid4()),
             }
@@ -408,6 +491,7 @@ async def botoes(update: Update, context):
                 "total_amount": f"{preco:.2f}",
                 "external_reference": f"vip_{query.from_user.id}",
                 "processing_mode": "automatic",
+                "application_fee": f"{application_fee:.2f}",  # 👈 SUA RETENÇÃO NA FONTE!
                 "transactions": {
                     "payments": [
                         {
