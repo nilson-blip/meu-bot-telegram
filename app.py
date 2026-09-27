@@ -15,15 +15,12 @@ from telegram import (
     Update,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    KeyboardButton,
-    KeyboardButtonRequestChat,
-    ReplyKeyboardMarkup,
-    ReplyKeyboardRemove,
 )
 from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
+    ChatMemberHandler,
     MessageHandler,
     filters,
 )
@@ -72,9 +69,9 @@ async def lifespan(app: FastAPI):
     telegram_app.add_handler(CommandHandler("configurar", iniciar_configuracao))
     telegram_app.add_handler(CallbackQueryHandler(botoes))
     
-    # Handler nativo para capturar o Canal/Grupo VIP selecionado pelo dono
+    # Handler nativo para capturar quando o bot é adicionado como admin em um Canal/Grupo VIP
     telegram_app.add_handler(
-        MessageHandler(filters.StatusUpdate.CHAT_SHARED, receber_grupo_vip)
+        ChatMemberHandler(capturar_novo_canal, ChatMemberHandler.MY_CHAT_MEMBER)
     )
 
     # Inicializa a aplicação e o bot do Telegram no event loop principal
@@ -335,15 +332,15 @@ async def verificar_acessos():
                 print(f"⛔ ACESSO EXPIRADO: {telegram_user_id}")
 
         except Exception as erro:
-            print(f"❌ ERRO AO VERIFICAR ACESSO: {acesso.get('telegram_user_id')}: 
-            
+            print(f"❌ ERRO AO VERIFICAR ACESSO: {acesso.get('telegram_user_id')}: {erro}")
+
 
 # ============================================================
 # HANDLERS DO TELEGRAM (CONFIGURAÇÃO 100% INLINE)
 # ============================================================
 
 async def iniciar_configuracao(update: Update, context):
-    """Exibe o menu de configuração usando botão Inline."""
+    """Exibe o menu de configuração usando botão Inline padronizado."""
     bot_info = await context.bot.get_me()
     
     # Link nativo do Telegram para vincular o bot a um canal/grupo em formato Inline
@@ -390,13 +387,12 @@ async def capturar_novo_canal(update: Update, context):
             "created_at": datetime.now(timezone.utc).isoformat()
         }).execute()
 
-        # Notifica no canal com confirmação elegante
+        # Notifica no canal com confirmação
         await context.bot.send_message(
             chat_id=chat_id_capturado,
             text="✅ **Bot configurado com sucesso neste canal!**\n\nAgora estou pronto para gerenciar as vendas e entradas dos membros.",
             parse_mode="Markdown"
         )
-
 
 
 # ============================================================
@@ -452,7 +448,6 @@ async def botoes(update: Update, context):
 
             payment_connection_id = conexao.data[0]["id"]
             
-            # Pega o token do Mercado Pago do Dono do VIP (via OAuth) ou usa o Token Padrão caso não exista
             client_access_token = conexao.data[0].get("access_token") or MP_TOKEN
             fee_percentage = float(conexao.data[0].get("fee_percentage") or 10.0)
 
@@ -488,7 +483,7 @@ async def botoes(update: Update, context):
                 "total_amount": f"{preco:.2f}",
                 "external_reference": f"vip_{query.from_user.id}",
                 "processing_mode": "automatic",
-                "application_fee": f"{application_fee:.2f}",  # 👈 SUA RETENÇÃO NA FONTE!
+                "application_fee": f"{application_fee:.2f}",
                 "transactions": {
                     "payments": [
                         {
