@@ -335,44 +335,40 @@ async def verificar_acessos():
                 print(f"⛔ ACESSO EXPIRADO: {telegram_user_id}")
 
         except Exception as erro:
-            print(f"❌ ERRO AO VERIFICAR ACESSO: {acesso.get('telegram_user_id')}: {erro}")
-
+            print(f"❌ ERRO AO VERIFICAR ACESSO: {acesso.get('telegram_user_id')}: 
+            
 
 # ============================================================
-# HANDLERS DO TELEGRAM (CONFIGURAÇÃO AUTOMÁTICA DO DONO)
+# HANDLERS DO TELEGRAM (CONFIGURAÇÃO 100% INLINE)
 # ============================================================
 
 async def iniciar_configuracao(update: Update, context):
-    """Comando para o Dono do VIP vincular o canal sem digitar ID técnico."""
-    botao_selecionar = KeyboardButton(
-        text="📢 Selecionar Meu Canal/Grupo VIP",
-        request_chat=KeyboardButtonRequestChat(
-            request_id=1,
-            chat_is_channel=True,
-            bot_is_member=True,
-        )
-    )
+    """Exibe o menu de configuração usando botão Inline."""
+    bot_info = await context.bot.get_me()
+    
+    # Link nativo do Telegram para vincular o bot a um canal/grupo em formato Inline
+    link_adicionar = f"https://t.me/{bot_info.username}?startchannel=true&admin=post_messages+add_admins+invite_users"
 
-    reply_markup = ReplyKeyboardMarkup(
-        [[botao_selecionar]], 
-        one_time_keyboard=True, 
-        resize_keyboard=True
-    )
+    botoes_config = [
+        [InlineKeyboardButton("📢 Vincular Canal/Grupo VIP", url=link_adicionar)]
+    ]
 
     await update.message.reply_text(
-        "👋 Vamos configurar seu grupo!\n\n"
-        "Clique no botão abaixo para escolher em qual Canal ou Grupo VIP eu devo gerenciar os acessos:",
-        reply_markup=reply_markup
+        "⚙️ **Painel de Configuração**\n\n"
+        "Clique no botão abaixo para adicionar este bot como Administrador do seu Canal ou Grupo VIP:\n\n"
+        "*(O bot irá identificar o grupo automaticamente assim que for adicionado)*",
+        reply_markup=InlineKeyboardMarkup(botoes_config),
+        parse_mode="Markdown"
     )
 
 
-async def receber_grupo_vip(update: Update, context):
-    """Recebe o chat_id retornado pelo Telegram de forma 100% transparente."""
-    chat_shared = update.message.chat_shared
-    chat_id_capturado = chat_shared.chat_id
-    telegram_user_id = update.effective_user.id
+async def capturar_novo_canal(update: Update, context):
+    """Detecta automaticamente quando o bot é adicionado ao canal/grupo pelo link inline."""
+    chat = update.my_chat_member.chat
+    chat_id_capturado = chat.id
+    chat_title = chat.title or "Canal VIP"
 
-    print(f"🎯 CHAT ID CAPTURADO AUTOMATICAMENTE: {chat_id_capturado}")
+    print(f"🎯 BOT ADICIONADO AO CANAL/GRUPO: {chat_title} (ID: {chat_id_capturado})")
 
     bot_info = await context.bot.get_me()
     bot_data = (
@@ -386,20 +382,21 @@ async def receber_grupo_vip(update: Update, context):
     if bot_data.data:
         client_id = bot_data.data[0]["client_id"]
         
-        # Salva o Grupo VIP capturado no Supabase
+        # Salva o canal automaticamente no Supabase vinculando ao cliente
         supabase.table("vip_groups").upsert({
             "client_id": client_id,
             "chat_id": str(chat_id_capturado),
-            "title": "Canal VIP Vinculado",
+            "title": chat_title,
             "created_at": datetime.now(timezone.utc).isoformat()
         }).execute()
 
-    await update.message.reply_text(
-        "✅ **Seu Canal/Grupo VIP foi vinculado com sucesso!**\n\n"
-        "Agora eu já sei para onde enviar os membros que pagarem.",
-        reply_markup=ReplyKeyboardRemove(),
-        parse_mode="Markdown"
-    )
+        # Notifica no canal com confirmação elegante
+        await context.bot.send_message(
+            chat_id=chat_id_capturado,
+            text="✅ **Bot configurado com sucesso neste canal!**\n\nAgora estou pronto para gerenciar as vendas e entradas dos membros.",
+            parse_mode="Markdown"
+        )
+
 
 
 # ============================================================
