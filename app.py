@@ -525,7 +525,7 @@ async def receber_valor_plano(update: Update, context):
         await update.message.reply_text("Por favor, informe um valor numérico válido (ex: <code>29.90</code>):", parse_mode="HTML")
         return AGUARDANDO_VALOR_PLANO
 
-    tempo = context.user_data.pop("plano_em_edicao")
+    tempo = context.user_data.pop("plano_em_edicao", "mensal")
     
     dias_map = {"semanal": 7, "quinzenal": 15, "mensal": 30, "vitalicio": 36500}
     dias = dias_map.get(tempo, 30)
@@ -578,7 +578,6 @@ async def decisao_mais_planos(update: Update, context):
 
 
 async def receber_midia(update: Update, context):
-    # Trata recebimento de arquivo de imagem/vídeo
     if update.message:
         if update.message.photo:
             context.user_data["media_file_id"] = update.message.photo[-1].file_id
@@ -600,7 +599,6 @@ async def receber_midia(update: Update, context):
         )
         return AGUARDANDO_MIDIA
 
-    # Trata cliques de botões (Pular Mídia ou Avançar para Grupo VIP)
     elif update.callback_query:
         query = update.callback_query
         await query.answer()
@@ -613,7 +611,6 @@ async def receber_midia(update: Update, context):
 
 
 async def exibir_instrucoes_grupo_vip(update: Update, context):
-    """Exibe as instruções para vincular o Bot do cliente ao canal VIP."""
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔍 Já adicionei o meu bot como Admin", callback_data="verificar_bot_cliente")],
         [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
@@ -638,7 +635,6 @@ async def exibir_instrucoes_grupo_vip(update: Update, context):
 
 
 async def verificar_grupo_vip_cliente(update: Update, context):
-    """Consulta a API do Telegram usando o Token do cliente para encontrar o canal VIP automaticamente."""
     query = update.callback_query
     await query.answer("Verificando o seu bot no canal...")
 
@@ -684,7 +680,8 @@ async def verificar_grupo_vip_cliente(update: Update, context):
                 "created_at": datetime.now(timezone.utc).isoformat()
             }).execute()
 
-            context.user_data["vip_group_id"] = res.data[0]["id"]
+            if res.data:
+                context.user_data["vip_group_id"] = res.data[0]["id"]
 
             await query.message.reply_text(
                 f"✅ <b>Canal detetado com sucesso!</b>\n\n"
@@ -720,7 +717,7 @@ async def exibir_revisao_final(message, context):
     dados = context.user_data
     planos_txt = ""
     for p in dados.get("planos", []):
-        planos_txt += f"• <b>Plano {html.escape(p['tempo'].capitalize())}</b>: R$ {p['valor']:.2f}\n"
+        planos_txt += f"• <b>Plano {html.escape(str(p['tempo']).capitalize())}</b>: R$ {p['valor']:.2f}\n"
 
     bot_name_safe = html.escape(str(dados.get('bot_name', '')))
     prod_nome_safe = html.escape(str(dados.get('produto_nome', '')))
@@ -755,58 +752,76 @@ async def concluir_configuracao(update: Update, context):
     telegram_user_id = update.effective_user.id
     client_id = obter_ou_criar_cliente(telegram_user_id)
 
-    supabase.table("products").update({"status": "inactive"}).eq("client_id", client_id).execute()
+    try:
+        # Desativa produtos antigos do cliente
+        supabase.table("products").update({"status": "inactive"}).eq("client_id", client_id).execute()
 
-    for p in dados.get("planos", []):
-        supabase.table("products").insert({
+        # Insere os novos produtos/planos com proteção de campos nulos
+        vip_group_id = dados.get("vip_group_id")
+        
+        for p in dados.get("planos", []):
+            prod_payload = {
+                "client_id": client_id,
+                "title": dados.get("produto_nome", "Produto VIP"),
+                "greeting_message": dados.get("saudacao", "Seja bem-vindo!"),
+                "price": float(p["valor"]),
+                "duration_type": str(p["tempo"]),
+                "duration_days": int(p["dias"]),
+                "media_file_id": dados.get("media_file_id"),
+                "media_type": dados.get("media_type"),
+                "status": "active",
+            }
+            if vip_group_id:
+                prod_payload["vip_group_id"] = vip_group_id
+
+            supabase.table("products").insert(prod_payload).execute()
+
+        # Registra o bot do cliente
+        supabase.table("telegram_bots").upsert({
             "client_id": client_id,
-            "title": dados.get("produto_nome"),
-            "greeting_message": dados.get("saudacao"),
-            "price": p["valor"],
-            "duration_type": p["tempo"],
-            "duration_days": p["dias"],
-            "media_file_id": dados.get("media_file_id"),
-            "media_type": dados.get("media_type"),
-            "vip_group_id": dados.get("vip_group_id"),
-            "status": "active",
+            "bot_id": dados.get("bot_id"),
+            "username": dados.get("bot_username"),
+            "bot_name": dados.get("bot_name"),
+            "bot_token": dados.get("bot_token"),
+            "status": "active"
         }).execute()
 
-    supabase.table("telegram_bots").upsert({
-        "client_id": client_id,
-        "bot_id": dados.get("bot_id"),
-        "username": dados.get("bot_username"),
-        "bot_name": dados.get("bot_name"),
-        "bot_token": dados.get("bot_token"),
-        "status": "active"
-    }).execute()
+        params = {
+            "client_id": MP_CLIENT_ID,
+            "response_type": "code",
+            "platform_id": "mp",
+            "redirect_uri": MP_REDIRECT_URI,
+            "state": str(telegram_user_id),
+        }
 
-    params = {
-        "client_id": MP_CLIENT_ID,
-        "response_type": "code",
-        "platform_id": "mp",
-        "redirect_uri": MP_REDIRECT_URI,
-        "state": str(telegram_user_id),
-    }
+        link_mp = f"https://auth.mercadopago.com.br/authorization?{urlencode(params)}"
 
-    link_mp = f"https://auth.mercadopago.com.br/authorization?{urlencode(params)}"
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔗 Conectar Mercado Pago", url=link_mp)],
+            [InlineKeyboardButton("✨ Finalizar e Concluir", callback_data="finalizar_tudo")]
+        ])
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔗 Conectar Mercado Pago", url=link_mp)],
-        [InlineKeyboardButton("✨ Finalizar e Concluir", callback_data="finalizar_tudo")]
-    ])
+        await query.message.reply_text(
+            "🎉 <b>Configuração Salva com Sucesso!</b>\n\n"
+            "💳 <b>Passo 6 de 6: Conectar Mercado Pago (Última Etapa)</b>\n\n"
+            "Para receber os pagamentos diretamente na sua conta bancária via Pix automatizado, "
+            "clique no botão abaixo para conectar seu Mercado Pago com segurança.\n\n"
+            "ℹ️ <b>Informação sobre taxas:</b>\n"
+            "• <b>Plataforma Bot:</b> 5% por venda efetuada.\n"
+            "• <b>Mercado Pago:</b> 0,99% por transação Pix.",
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+        return ConversationHandler.END
 
-    await query.message.reply_text(
-        "🎉 <b>Configuração Salva com Sucesso!</b>\n\n"
-        "💳 <b>Passo 6 de 6: Conectar Mercado Pago (Última Etapa)</b>\n\n"
-        "Para receber os pagamentos diretamente na sua conta bancária via Pix automatizado, "
-        "clique no botão abaixo para conectar seu Mercado Pago com segurança.\n\n"
-        "ℹ️ <b>Informação sobre taxas:</b>\n"
-        "• <b>Plataforma Bot:</b> 5% por venda efetuada.\n"
-        "• <b>Mercado Pago:</b> 0,99% por transação Pix.",
-        reply_markup=keyboard,
-        parse_mode="HTML"
-    )
-    return ConversationHandler.END
+    except Exception as e:
+        print(f"❌ ERRO AO CONCLUIR CONFIGURAÇÃO NO SUPABASE: {e}")
+        await query.message.reply_text(
+            "❌ <b>Ocorreu um erro ao salvar as configurações no banco de dados.</b>\n"
+            "Por favor, tente rodar `/configurar` novamente.",
+            parse_mode="HTML"
+        )
+        return ConversationHandler.END
 
 
 # ============================================================
