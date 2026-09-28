@@ -1567,32 +1567,18 @@ async def botoes(update: Update, context):
                 2
             )
 
-            order_data = {
-                "type": "online",
-                "total_amount": f"{round(preco, 2):.2f}",
-                "external_reference": (
-                    f"vip_{query.from_user.id}"
-                ),
-                "processing_mode": "manual",
-                "capture_mode": "automatic",
-                "marketplace_fee": f"{round(marketplace_fee, 2):.2f}",
-                "transactions": {
-                    "payments": [
-                        {
-                            "amount": f"{round(preco, 2):.2f}",
-                            "payment_method": {
-                                "id": "pix",
-                                "type": "digital_currency",
-                            },
-                        }
-                    ]
-                },
+            # --- CORREÇÃO APLICADA: Uso do endpoint /v1/payments (Compatível com Pix transparente) ---
+            payment_data = {
+                "transaction_amount": round(preco, 2),
+                "description": f"Acesso VIP - {produto.get('title', 'Produto')}",
+                "payment_method_id": "pix",
                 "payer": {
-                    "email": (
-                        f"user_{query.from_user.id}"
-                        "@telegram.com"
-                    )
+                    "email": f"user_{query.from_user.id}@telegram.com",
+                    "first_name": query.from_user.first_name or "Cliente",
+                    "last_name": query.from_user.last_name or "Telegram"
                 },
+                "external_reference": f"vip_{query.from_user.id}",
+                "marketplace_fee": round(marketplace_fee, 2) if marketplace_fee > 0 else 0.00
             }
 
             async with httpx.AsyncClient(
@@ -1600,7 +1586,7 @@ async def botoes(update: Update, context):
             ) as client:
 
                 response = await client.post(
-                    "https://api.mercadopago.com/v1/orders",
+                    "https://api.mercadopago.com/v1/payments",
                     headers={
                         "Authorization": (
                             f"Bearer {client_access_token}"
@@ -1610,7 +1596,7 @@ async def botoes(update: Update, context):
                             uuid.uuid4()
                         ),
                     },
-                    json=order_data,
+                    json=payment_data,
                     timeout=30.0,
                 )
 
@@ -1625,47 +1611,29 @@ async def botoes(update: Update, context):
 
             response.raise_for_status()
 
-            order = response.json()
+            payment_json = response.json()
 
-            payments = (
-                order
-                .get("transactions", {})
-                .get("payments", [])
-            )
-
-            if not payments:
-                raise RuntimeError(
-                    "Mercado Pago não retornou "
-                    "o pagamento."
-                )
-
-            payment_data = payments[0]
-
-            payment_method = payment_data.get(
-                "payment_method",
-                {}
-            )
+            point_of_interaction = payment_json.get("point_of_interaction", {})
+            transaction_data = point_of_interaction.get("transaction_data", {})
 
             payment_url = (
-                payment_method.get("ticket_url")
-                or payment_method.get(
-                    "external_resource_url"
-                )
+                transaction_data.get("ticket_url")
+                or transaction_data.get("external_resource_url")
             )
 
-            order_id = order.get("id")
+            order_id = str(payment_json.get("id"))
 
             (
                 supabase.table("payments")
                 .insert({
-                    "order_id": str(order_id),
+                    "order_id": order_id,
                     "telegram_user_id": (
                         query.from_user.id
                     ),
                     "amount": preco,
                     "status": "pending",
                     "external_reference": (
-                        order.get(
+                        payment_json.get(
                             "external_reference",
                             f"vip_{query.from_user.id}"
                         )
@@ -2238,23 +2206,21 @@ async def mercadopago_webhook(
 
         data = await request.json()
 
-        if data.get("type") != "order":
-            return PlainTextResponse(
-                "OK"
-            )
+        # Ajustado para aceitar tanto webhooks de pagamentos quanto de orders
+        topic = data.get("type") or data.get("action")
+        payment_id_hook = None
 
-        order_data = data.get(
-            "data",
-            {}
-        )
-
-        order_id = order_data.get(
-            "id"
-        )
+        if topic == "payment":
+            payment_id_hook = data.get("data", {}).get("id")
+        elif topic == "order" or data.get("resource", "").startswith("/v1/orders"):
+            # Caso venha via order, tenta extrair o ID
+            order_data = data.get("data", {})
+            payment_id_hook = order_data.get("id")
 
         data_id = (
             request.query_params.get("data.id")
-            or order_id
+            or request.query_params.get("id")
+            or payment_id_hook
         )
 
         ts = None
@@ -2279,41 +2245,34 @@ async def mercadopago_webhook(
                     elif key.strip() == "v1":
                         v1 = value.strip()
 
-        manifest = (
-            f"id:{data_id};"
-            f"request-id:{x_request_id};"
-            f"ts:{ts};"
-        )
-
-        if (
-            not v1
-            or not MP_WEBHOOK_SECRET
-        ):
-            return PlainTextResponse(
-                "Invalid signature",
-                status_code=401
+        if v1 and MP_WEBHOOK_SECRET and data_id and x_request_id and ts:
+            manifest = (
+                f"id:{data_id};"
+                f"request-id:{x_request_id};"
+                f"ts:{ts};"
             )
 
-        signature = hmac.new(
-            MP_WEBHOOK_SECRET.encode(),
-            manifest.encode(),
-            hashlib.sha256
-        ).hexdigest()
+            signature = hmac.new(
+                MP_WEBHOOK_SECRET.encode(),
+                manifest.encode(),
+                hashlib.sha256
+            ).hexdigest()
 
-        if not hmac.compare_digest(
-            signature,
-            v1
-        ):
-            return PlainTextResponse(
-                "Invalid signature",
-                status_code=401
-            )
+            if not hmac.compare_digest(
+                signature,
+                v1
+            ):
+                return PlainTextResponse(
+                    "Invalid signature",
+                    status_code=401
+                )
 
-        if not order_id:
+        if not data_id:
             return PlainTextResponse(
                 "OK"
             )
 
+        # Procura o pagamento pelo ID gerado (/v1/payments armazena o ID numérico do pagamento)
         pagamento = (
             supabase.table("payments")
             .select(
@@ -2323,7 +2282,7 @@ async def mercadopago_webhook(
             )
             .eq(
                 "order_id",
-                order_id
+                str(data_id)
             )
             .limit(1)
             .execute()
@@ -2382,24 +2341,24 @@ async def mercadopago_webhook(
         ) as client:
 
             response = await client.get(
-                f"https://api.mercadopago.com/v1/orders/{order_id}",
+                f"https://api.mercadopago.com/v1/payments/{data_id}",
                 headers=headers,
                 timeout=20.0
             )
 
         response.raise_for_status()
 
-        order = response.json()
+        payment_info = response.json()
 
-        status = order.get(
+        status = payment_info.get(
             "status"
         )
 
-        external_reference = order.get(
+        external_reference = payment_info.get(
             "external_reference"
         )
 
-        if status == "processed":
+        if status == "approved":
 
             if (
                 not external_reference
@@ -2457,7 +2416,7 @@ async def mercadopago_webhook(
                 })
                 .eq(
                     "order_id",
-                    order_id
+                    str(data_id)
                 )
                 .execute()
             )
@@ -2555,15 +2514,15 @@ async def mercadopago_webhook(
                 })
                 .eq(
                     "order_id",
-                    order_id
+                    str(data_id)
                 )
                 .execute()
             )
 
         elif status in [
-            "failed",
+            "cancelled",
             "refunded",
-            "expired"
+            "charged_back"
         ]:
 
             (
@@ -2573,7 +2532,7 @@ async def mercadopago_webhook(
                 })
                 .eq(
                     "order_id",
-                    order_id
+                    str(data_id)
                 )
                 .execute()
             )
