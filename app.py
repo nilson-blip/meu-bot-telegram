@@ -1361,7 +1361,6 @@ async def start(update: Update, context):
         reply_markup=ReplyKeyboardRemove()
     )
 
-    # CORREÇÃO: Busca estrita pelo token do bot atual para evitar misturar dados
     token_atual = context.bot.token
 
     bot_data = (
@@ -1568,7 +1567,6 @@ async def botoes(update: Update, context):
                 2
             )
 
-                        # CORREÇÃO: Conversão dos valores para string e ajuste do tipo de pagamento Pix
             order_data = {
                 "type": "online",
                 "total_amount": f"{round(preco, 2):.2f}",
@@ -1584,19 +1582,11 @@ async def botoes(update: Update, context):
                             "amount": f"{round(preco, 2):.2f}",
                             "payment_method": {
                                 "id": "pix",
-                                "type": "digital_currency", # Alterado de bank_transfer para digital_currency conforme exigência da API
+                                "type": "digital_currency",
                             },
                         }
                     ]
                 },
-                "payer": {
-                    "email": (
-                        f"user_{query.from_user.id}"
-                        "@telegram.com"
-                    )
-                },
-            }
-
                 "payer": {
                     "email": (
                         f"user_{query.from_user.id}"
