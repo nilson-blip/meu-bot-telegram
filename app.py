@@ -1081,9 +1081,9 @@ async def botoes(update: Update, context):
                     "first_name": query.from_user.first_name or "Cliente",
                     "last_name": query.from_user.last_name or "Telegram"
                 },
-                "external_reference": f"vip_{query.from_user.id}"
+                "external_reference": f"vip_{query.from_user.id}",
+                "application_fee": round(marketplace_fee, 2) if marketplace_fee > 0 else 0.00
             }
-
 
             async with httpx.AsyncClient(follow_redirects=True) as client:
                 response = await client.post(
@@ -1096,6 +1096,9 @@ async def botoes(update: Update, context):
                     json=payment_data,
                     timeout=30.0,
                 )
+
+            if response.status_code != 201:
+                print(f"⚠️ RESPOSTA DETALHADA DO MERCADO PAGO: {response.text}")
 
             response.raise_for_status()
             payment_json = response.json()
@@ -1161,7 +1164,6 @@ async def botoes(update: Update, context):
                     )
             except Exception:
                 pass
-
 
 
 # ============================================================
