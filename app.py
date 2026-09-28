@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import uuid
 import html
+import requests
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
@@ -413,7 +414,6 @@ async def receber_token_bot(update: Update, context):
     token_inserido = update.message.text.strip()
 
     try:
-        # Inicializa o bot temporário corretamente para evitar falha de sessão HTTP
         temp_bot = Bot(token=token_inserido)
         await temp_bot.initialize()
         bot_info = await temp_bot.get_me()
@@ -434,7 +434,6 @@ async def receber_token_bot(update: Update, context):
         [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
     ])
 
-    # Usamos html.escape para garantir que nomes com caracteres especiais não façam o parse falhar
     username_limpo = html.escape(bot_info.username or "")
 
     await update.message.reply_text(
@@ -579,19 +578,14 @@ async def decisao_mais_planos(update: Update, context):
 
 
 async def receber_midia(update: Update, context):
-    media_file_id = None
-    media_type = None
-
+    # Trata recebimento de arquivo de imagem/vídeo
     if update.message:
         if update.message.photo:
-            media_file_id = update.message.photo[-1].file_id
-            media_type = "photo"
+            context.user_data["media_file_id"] = update.message.photo[-1].file_id
+            context.user_data["media_type"] = "photo"
         elif update.message.video:
-            media_file_id = update.message.video.file_id
-            media_type = "video"
-        
-        context.user_data["media_file_id"] = media_file_id
-        context.user_data["media_type"] = media_type
+            context.user_data["media_file_id"] = update.message.video.file_id
+            context.user_data["media_type"] = "video"
 
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("➡️ Avançar para Grupo VIP", callback_data="avancar_grupo_vip")],
@@ -606,6 +600,7 @@ async def receber_midia(update: Update, context):
         )
         return AGUARDANDO_MIDIA
 
+    # Trata cliques de botões (Pular Mídia ou Avançar para Grupo VIP)
     elif update.callback_query:
         query = update.callback_query
         await query.answer()
@@ -614,60 +609,114 @@ async def receber_midia(update: Update, context):
             context.user_data["media_file_id"] = None
             context.user_data["media_type"] = None
 
-    telegram_user_id = update.effective_user.id
-    client_id = obter_ou_criar_cliente(telegram_user_id)
+        return await exibir_instrucoes_grupo_vip(update, context)
 
-    grupos = (
-        supabase.table("vip_groups")
-        .select("id, title, chat_id")
-        .eq("client_id", client_id)
-        .execute()
+
+async def exibir_instrucoes_grupo_vip(update: Update, context):
+    """Exibe as instruções para vincular o Bot do cliente ao canal VIP."""
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔍 Já adicionei o meu bot como Admin", callback_data="verificar_bot_cliente")],
+        [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
+    ])
+
+    msg = (
+        "📢 <b>Passo 6 de 6: Vincular Canal/Grupo VIP</b>\n\n"
+        "Agora precisamos de conectar o <b>seu bot</b> ao seu Canal ou Grupo VIP:\n\n"
+        "1. Abra o seu <b>Canal/Grupo VIP</b> no Telegram.\n"
+        "2. Adicione o <b>seu bot</b> (aquele cujo Token você enviou) como <b>Administrador</b>.\n"
+        "3. Garanta que ele tem permissão para <i>Convidar Usuários via Link</i>.\n"
+        "4. Envie uma mensagem qualquer no canal para ativar a conexão.\n\n"
+        "Quando concluir, clique no botão abaixo:"
     )
 
-    if grupos.data:
-        botoes_grupos = []
-        for g in grupos.data:
-            botoes_grupos.append([
-                InlineKeyboardButton(f"📢 {g['title']}", callback_data=f"selecionar_grupo_{g['id']}")
-            ])
-        botoes_grupos.append([InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")])
-        keyboard = InlineKeyboardMarkup(botoes_grupos)
-        msg = "📢 <b>Selecione o seu Canal/Grupo VIP de destino:</b>"
+    if update.callback_query:
+        await update.callback_query.message.reply_text(msg, reply_markup=keyboard, parse_mode="HTML")
     else:
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
-        ])
-        msg = (
-            "📢 <b>Vincular Grupo/Canal VIP</b>\n\n"
-            "Por favor, envie o <b>ID do Canal/Grupo VIP</b> (Exemplo: <code>-100123456789</code>):\n\n"
-            "💡 <i>Dica: Adicione seu bot recém-cadastrado como Administrador do seu canal.</i>"
-        )
+        await update.message.reply_text(msg, reply_markup=keyboard, parse_mode="HTML")
 
-    await (update.message or update.callback_query.message).reply_text(
-        msg, reply_markup=keyboard, parse_mode="HTML"
-    )
     return AGUARDANDO_GRUPO_VIP
 
 
-async def receber_grupo_vip(update: Update, context):
-    if update.callback_query:
-        query = update.callback_query
-        await query.answer()
-        vip_group_id = query.data.replace("selecionar_grupo_", "")
-        context.user_data["vip_group_id"] = vip_group_id
-    else:
-        chat_id_input = update.message.text.strip()
-        telegram_user_id = update.effective_user.id
-        client_id = obter_ou_criar_cliente(telegram_user_id)
+async def verificar_grupo_vip_cliente(update: Update, context):
+    """Consulta a API do Telegram usando o Token do cliente para encontrar o canal VIP automaticamente."""
+    query = update.callback_query
+    await query.answer("Verificando o seu bot no canal...")
 
-        res = supabase.table("vip_groups").upsert({
-            "client_id": client_id,
-            "chat_id": chat_id_input,
-            "title": "Canal VIP",
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }).execute()
-        context.user_data["vip_group_id"] = res.data[0]["id"]
+    bot_token_cliente = context.user_data.get("bot_token")
 
+    if not bot_token_cliente:
+        await query.message.reply_text("❌ Erro: Token do seu bot não foi encontrado. Por favor, digite /configurar para reiniciar.")
+        return AGUARDANDO_GRUPO_VIP
+
+    try:
+        url = f"https://api.telegram.org/bot{bot_token_cliente}/getUpdates"
+        response = requests.get(url, timeout=10).json()
+
+        chat_id = None
+        chat_title = None
+
+        if response.get("ok"):
+            for result in reversed(response.get("result", [])):
+                if "my_chat_member" in result:
+                    chat_info = result["my_chat_member"]["chat"]
+                    chat_id = str(chat_info["id"])
+                    chat_title = chat_info.get("title", "Canal VIP")
+                    break
+                elif "channel_post" in result:
+                    chat_info = result["channel_post"]["chat"]
+                    chat_id = str(chat_info["id"])
+                    chat_title = chat_info.get("title", "Canal VIP")
+                    break
+                elif "message" in result:
+                    chat_info = result["message"]["chat"]
+                    chat_id = str(chat_info["id"])
+                    chat_title = chat_info.get("title", "Canal VIP")
+                    break
+
+        if chat_id:
+            telegram_user_id = update.effective_user.id
+            client_id = obter_ou_criar_cliente(telegram_user_id)
+
+            res = supabase.table("vip_groups").upsert({
+                "client_id": client_id,
+                "chat_id": chat_id,
+                "title": chat_title,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }).execute()
+
+            context.user_data["vip_group_id"] = res.data[0]["id"]
+
+            await query.message.reply_text(
+                f"✅ <b>Canal detetado com sucesso!</b>\n\n"
+                f"📢 <b>Canal:</b> {html.escape(chat_title)}",
+                parse_mode="HTML"
+            )
+
+            return await exibir_revisao_final(query.message, context)
+
+        else:
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Tentar Novamente", callback_data="verificar_bot_cliente")],
+                [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
+            ])
+            await query.message.reply_text(
+                "⚠️ <b>Ainda não conseguimos detetar o seu bot no canal.</b>\n\n"
+                "Certifique-se de que:\n"
+                "1. Adicionou o seu bot <b>como Administrador</b> do canal/grupo.\n"
+                "2. Enviou qualquer mensagem no canal para ativar a deteção.\n\n"
+                "Depois clique em <b>Tentar Novamente</b>.",
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+            return AGUARDANDO_GRUPO_VIP
+
+    except Exception as e:
+        print(f"Erro ao verificar bot do cliente: {e}")
+        await query.message.reply_text("❌ Ocorreu um erro ao verificar o bot. Tente novamente em alguns segundos.")
+        return AGUARDANDO_GRUPO_VIP
+
+
+async def exibir_revisao_final(message, context):
     dados = context.user_data
     planos_txt = ""
     for p in dados.get("planos", []):
@@ -692,7 +741,7 @@ async def receber_grupo_vip(update: Update, context):
         [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
     ])
 
-    await (update.message or update.callback_query.message).reply_text(
+    await message.reply_text(
         texto_revisao, reply_markup=keyboard, parse_mode="HTML"
     )
     return AGUARDANDO_REVISAO
@@ -996,8 +1045,7 @@ async def lifespan(app: FastAPI):
                 MessageHandler(filters.PHOTO | filters.VIDEO, receber_midia),
             ],
             AGUARDANDO_GRUPO_VIP: [
-                CallbackQueryHandler(receber_grupo_vip, pattern="^selecionar_grupo_"),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, receber_grupo_vip),
+                CallbackQueryHandler(verificar_grupo_vip_cliente, pattern="^verificar_bot_cliente$"),
             ],
             AGUARDANDO_REVISAO: [
                 CallbackQueryHandler(concluir_configuracao, pattern="^concluir_onboarding$"),
