@@ -777,14 +777,21 @@ async def concluir_configuracao(update: Update, context):
             supabase.table("products").insert(prod_payload).execute()
 
         # Registra o bot do cliente
+        custom_bot_token = dados.get("bot_token")
         supabase.table("telegram_bots").upsert({
             "client_id": client_id,
             "bot_id": dados.get("bot_id"),
             "username": dados.get("bot_username"),
             "bot_name": dados.get("bot_name"),
-            "bot_token": dados.get("bot_token"),
+            "bot_token": custom_bot_token,
             "status": "active"
         }).execute()
+
+        # Configura automaticamente o webhook dinâmico para o bot do cliente
+        if custom_bot_token:
+            webhook_url = f"https://meu-bot-telegram-production-d9c3.up.railway.app/telegram/{custom_bot_token}"
+            async with Bot(token=custom_bot_token) as custom_bot:
+                await custom_bot.set_webhook(url=webhook_url)
 
         params = {
             "client_id": MP_CLIENT_ID,
@@ -825,13 +832,14 @@ async def concluir_configuracao(update: Update, context):
 
 
 # ============================================================
-# FLUXO DO CLIENTE FINAL (/start)
+# FLUXO DO CLIENTE FINAL (/start e Botões)
 # ============================================================
 
 async def start(update: Update, context):
     await update.message.reply_text("⏳ Carregando planos...", reply_markup=ReplyKeyboardRemove())
 
-    bot_username = (await context.bot.get_me()).username
+    bot_me = await context.bot.get_me()
+    bot_username = bot_me.username
 
     bot_data = (
         supabase.table("telegram_bots")
@@ -949,15 +957,15 @@ async def botoes(update: Update, context):
 
             order_data = {
                 "type": "online",
-                "total_amount": f"{preco:.2f}",
+                "total_amount": round(preco, 2),
                 "external_reference": f"vip_{query.from_user.id}",
                 "processing_mode": "manual",
                 "capture_mode": "automatic",
-                "marketplace_fee": f"{marketplace_fee:.2f}",
+                "marketplace_fee": round(marketplace_fee, 2),
                 "transactions": {
                     "payments": [
                         {
-                            "amount": f"{preco:.2f}",
+                            "amount": round(preco, 2),
                             "payment_method": {
                                 "id": "pix",
                                 "type": "bank_transfer",
@@ -965,7 +973,9 @@ async def botoes(update: Update, context):
                         }
                     ]
                 },
-                "payer": {"email": "cliente@email.com"},
+                "payer": {
+                    "email": f"user_{query.from_user.id}@telegram.com"
+                },
             }
 
             async with httpx.AsyncClient(follow_redirects=True) as client:
@@ -975,6 +985,9 @@ async def botoes(update: Update, context):
                     json=order_data,
                     timeout=20.0,
                 )
+
+            if response.status_code != 200 and response.status_code != 201:
+                print(f"❌ DETALHES DO ERRO DO MERCADO PAGO: {response.text}")
 
             response.raise_for_status()
             order = response.json()
@@ -989,7 +1002,7 @@ async def botoes(update: Update, context):
             order_id = order.get("id")
 
             supabase.table("payments").insert({
-                "order_id": order_id,
+                "order_id": str(order_id),
                 "telegram_user_id": query.from_user.id,
                 "amount": preco,
                 "status": "pending",
@@ -1003,25 +1016,30 @@ async def botoes(update: Update, context):
                 "payment_connection_id": payment_connection_id,
             }).execute()
 
-            await context.bot.send_message(
-                chat_id=query.from_user.id,
-                text=(
-                    f"💰 <b>Pix gerado para o Plano {html.escape(str(produto['duration_type']).capitalize())}!</b>\n\n"
-                    "Clique no botão abaixo para efetuar o pagamento com segurança:"
-                ),
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("💳 Pagar via Pix", url=payment_url)]
-                ]),
-                parse_mode="HTML"
-            )
+            # Responde usando o Bot do Cliente específico para evitar mutes
+            custom_token = await obter_token_bot_cliente(client_id)
+            async with Bot(token=custom_token) as client_bot:
+                await client_bot.send_message(
+                    chat_id=query.from_user.id,
+                    text=(
+                        f"💰 <b>Pix gerado para o Plano {html.escape(str(produto['duration_type']).capitalize())}!</b>\n\n"
+                        "Clique no botão abaixo para efetuar o pagamento com segurança:"
+                    ),
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("💳 Pagar via Pix", url=payment_url)]
+                    ]),
+                    parse_mode="HTML"
+                )
 
         except Exception as erro:
             print(f"❌ ERRO AO GERAR PAGAMENTO: {erro}")
             try:
-                await context.bot.send_message(
-                    chat_id=query.from_user.id,
-                    text="Por favor, tente novamente em alguns instantes.",
-                )
+                custom_token = await obter_token_bot_cliente(client_id)
+                async with Bot(token=custom_token) as client_bot:
+                    await client_bot.send_message(
+                        chat_id=query.from_user.id,
+                        text="Por favor, tente novamente em alguns instantes.",
+                    )
             except Exception:
                 pass
 
@@ -1232,6 +1250,19 @@ async def telegram_webhook(request: Request):
         await telegram_app.process_update(update)
         return PlainTextResponse("OK")
     except Exception as e:
+        return PlainTextResponse(f"Erro: {e}", status_code=500)
+
+
+@app.post("/telegram/{custom_bot_token}")
+async def custom_telegram_webhook(custom_bot_token: str, request: Request):
+    try:
+        data = await request.json()
+        async with Bot(token=custom_bot_token) as custom_bot:
+            update = Update.de_json(data, bot=custom_bot)
+            await telegram_app.process_update(update)
+        return PlainTextResponse("OK")
+    except Exception as e:
+        print(f"❌ Erro Webhook Customizado: {e}")
         return PlainTextResponse(f"Erro: {e}", status_code=500)
 
 
