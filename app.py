@@ -753,10 +753,8 @@ async def concluir_configuracao(update: Update, context):
     client_id = obter_ou_criar_cliente(telegram_user_id)
 
     try:
-        # Desativa produtos antigos do cliente
         supabase.table("products").update({"status": "inactive"}).eq("client_id", client_id).execute()
 
-        # Insere os novos produtos/planos com proteção de campos nulos
         vip_group_id = dados.get("vip_group_id")
         
         for p in dados.get("planos", []):
@@ -776,7 +774,6 @@ async def concluir_configuracao(update: Update, context):
 
             supabase.table("products").insert(prod_payload).execute()
 
-        # Registra o bot do cliente
         custom_bot_token = dados.get("bot_token")
         supabase.table("telegram_bots").upsert({
             "client_id": client_id,
@@ -787,7 +784,6 @@ async def concluir_configuracao(update: Update, context):
             "status": "active"
         }).execute()
 
-        # Configura automaticamente o webhook dinâmico para o bot do cliente
         if custom_bot_token:
             webhook_url = f"https://meu-bot-telegram-production-d9c3.up.railway.app/telegram/{custom_bot_token}"
             async with Bot(token=custom_bot_token) as custom_bot:
@@ -955,17 +951,18 @@ async def botoes(update: Update, context):
                 "X-Idempotency-Key": str(uuid.uuid4()),
             }
 
+            # CORRIGIDO: Valores convertidos para string (ex: "29.90") conforme exigido pela API v1/orders do Mercado Pago
             order_data = {
                 "type": "online",
-                "total_amount": round(preco, 2),
+                "total_amount": f"{preco:.2f}",
                 "external_reference": f"vip_{query.from_user.id}",
                 "processing_mode": "manual",
                 "capture_mode": "automatic",
-                "marketplace_fee": round(marketplace_fee, 2),
+                "marketplace_fee": f"{marketplace_fee:.2f}",
                 "transactions": {
                     "payments": [
                         {
-                            "amount": round(preco, 2),
+                            "amount": f"{preco:.2f}",
                             "payment_method": {
                                 "id": "pix",
                                 "type": "bank_transfer",
@@ -1016,7 +1013,6 @@ async def botoes(update: Update, context):
                 "payment_connection_id": payment_connection_id,
             }).execute()
 
-            # Responde usando o Bot do Cliente específico para evitar mutes
             custom_token = await obter_token_bot_cliente(client_id)
             async with Bot(token=custom_token) as client_bot:
                 await client_bot.send_message(
