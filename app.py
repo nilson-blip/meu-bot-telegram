@@ -1567,7 +1567,7 @@ async def botoes(update: Update, context):
                 2
             )
 
-            # --- CORREÇÃO APLICADA: Uso do endpoint /v1/payments (Compatível com Pix transparente) ---
+            # CORREÇÃO APLICADA: Uso do endpoint /v1/payments (Compatível com Pix transparente) ---
             payment_data = {
                 "transaction_amount": round(preco, 2),
                 "description": f"Acesso VIP - {produto.get('title', 'Produto')}",
@@ -1577,8 +1577,9 @@ async def botoes(update: Update, context):
                     "first_name": query.from_user.first_name or "Cliente",
                     "last_name": query.from_user.last_name or "Telegram"
                 },
-                "external_reference": f"vip_{query.from_user.id}",
-                "marketplace_fee": round(marketplace_fee, 2) if marketplace_fee > 0 else 0.00
+                "external_reference": f"vip_{query.from_user.id}"
+            }
+
             }
 
             async with httpx.AsyncClient(
