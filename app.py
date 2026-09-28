@@ -1361,20 +1361,20 @@ async def start(update: Update, context):
         reply_markup=ReplyKeyboardRemove()
     )
 
-    bot_me = await context.bot.get_me()
-    bot_username = bot_me.username
+    # CORREÇÃO: Busca estrita pelo token do bot atual para evitar misturar dados
+    token_atual = context.bot.token
 
     bot_data = (
         supabase.table("telegram_bots")
         .select("client_id")
-        .eq("username", bot_username)
+        .eq("bot_token", token_atual)
         .limit(1)
         .execute()
     )
 
     if not bot_data.data:
         await update.message.reply_text(
-            "👋 Este bot ainda está em fase de configuração."
+            "👋 Este bot ainda não está em fase de configuração ou token não mapeado."
         )
         return
 
@@ -1568,31 +1568,20 @@ async def botoes(update: Update, context):
                 2
             )
 
-            headers = {
-                "Authorization": (
-                    f"Bearer {client_access_token}"
-                ),
-                "Content-Type": "application/json",
-                "X-Idempotency-Key": str(
-                    uuid.uuid4()
-                ),
-            }
-
+            # CORREÇÃO: Valores numéricos float puros para evitar 400 Bad Request no MP
             order_data = {
                 "type": "online",
-                "total_amount": f"{preco:.2f}",
+                "total_amount": round(preco, 2),
                 "external_reference": (
                     f"vip_{query.from_user.id}"
                 ),
                 "processing_mode": "manual",
                 "capture_mode": "automatic",
-                "marketplace_fee": (
-                    f"{marketplace_fee:.2f}"
-                ),
+                "marketplace_fee": round(marketplace_fee, 2),
                 "transactions": {
                     "payments": [
                         {
-                            "amount": f"{preco:.2f}",
+                            "amount": round(preco, 2),
                             "payment_method": {
                                 "id": "pix",
                                 "type": "bank_transfer",
