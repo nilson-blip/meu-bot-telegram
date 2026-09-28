@@ -13,11 +13,13 @@ from fastapi.responses import PlainTextResponse, RedirectResponse
 from supabase import create_client, Client
 
 from telegram import (
+    Bot,
     Update,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     ReplyKeyboardRemove,
     ChatMember,
+    ChatMemberUpdated,
 )
 from telegram.ext import (
     Application,
@@ -70,7 +72,7 @@ telegram_app: Application = (
 
 
 # ============================================================
-# ESTADOS DO CONVERSATION HANDLER (MÚLTIPLOS PLANOS)
+# ESTADOS DO CONVERSATION HANDLER
 # ============================================================
 
 (
@@ -115,8 +117,7 @@ def obter_ou_criar_cliente(telegram_user_id: int):
 
 
 async def capturar_novo_canal(update: Update, context):
-    """Função invocada quando o bot é adicionado a um canal ou grupo."""
-    result = update.my_chat_member
+    result: ChatMemberUpdated = update.my_chat_member
     if not result:
         return
 
@@ -124,7 +125,6 @@ async def capturar_novo_canal(update: Update, context):
     new_status = result.new_chat_member.status
     old_status = result.old_chat_member.status
 
-    # Se o bot foi promovido a administrador ou adicionado ao chat
     if new_status in [ChatMember.ADMINISTRATOR, ChatMember.MEMBER] and old_status not in [ChatMember.ADMINISTRATOR, ChatMember.MEMBER]:
         from_user_id = result.from_user.id
         client_id = obter_ou_criar_cliente(from_user_id)
@@ -136,7 +136,7 @@ async def capturar_novo_canal(update: Update, context):
                 "title": chat.title or "Canal/Grupo VIP",
                 "created_at": datetime.now(timezone.utc).isoformat()
             }).execute()
-            print(f"✅ Grupo/Canal '{chat.title}' (ID: {chat.id}) vinculado ao cliente {client_id}")
+            print(f"✅ Canal '{chat.title}' vinculado ao cliente {client_id}")
         except Exception as e:
             print(f"❌ Erro ao registrar canal no Supabase: {e}")
 
@@ -170,6 +170,20 @@ async def registrar_bot(client_id: int):
     return resultado.data[0]["id"]
 
 
+async def obter_token_bot_cliente(client_id: int) -> str:
+    bot_res = (
+        supabase.table("telegram_bots")
+        .select("bot_token")
+        .eq("client_id", client_id)
+        .eq("status", "active")
+        .limit(1)
+        .execute()
+    )
+    if bot_res.data and bot_res.data[0].get("bot_token"):
+        return bot_res.data[0]["bot_token"]
+    return BOT_TOKEN
+
+
 async def verificar_remarketing():
     agora = datetime.now(timezone.utc)
     pagamentos = (
@@ -196,20 +210,26 @@ async def verificar_remarketing():
 
             telegram_user_id = int(pagamento["telegram_user_id"])
             payment_url = pagamento.get("payment_url")
+            client_id = pagamento.get("client_id")
+
             if not payment_url:
                 continue
 
-            await telegram_app.bot.send_message(
-                chat_id=telegram_user_id,
-                text=(
-                    "⌛ Seu pagamento ainda não foi concluído.\n\n"
-                    "Seu acesso VIP está esperando por você!\n\n"
-                    "👇 Se ainda quiser entrar, finalize o pagamento:"
-                ),
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("💳 Finalizar pagamento", url=payment_url)]
-                ]),
-            )
+            custom_token = await obter_token_bot_cliente(client_id)
+            async with Bot(token=custom_token) as client_bot:
+                await client_bot.send_message(
+                    chat_id=telegram_user_id,
+                    text=(
+                        "⌛ **Ainda dá tempo de garantir sua vaga!**\n\n"
+                        "Notei que você gerou o Pix mas não concluiu o pagamento. "
+                        "Seus dados e sua vaga no canal VIP estão reservados por tempo limitado.\n\n"
+                        "Clique no botão abaixo para concluir:"
+                    ),
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("💳 Concluir Meu Acesso", url=payment_url)]
+                    ]),
+                    parse_mode="Markdown"
+                )
 
             supabase.table("payments").update({"remarketing_enviado": True}).eq("id", pagamento["id"]).execute()
         except Exception as erro:
@@ -277,6 +297,7 @@ async def verificar_acessos():
     for acesso in acessos.data:
         try:
             telegram_user_id = acesso["telegram_user_id"]
+            client_id = acesso["client_id"]
             data_expiracao = datetime.fromisoformat(acesso["data_expiracao"].replace("Z", "+00:00"))
 
             if (data_expiracao - agora).total_seconds() <= 0:
@@ -301,47 +322,52 @@ async def verificar_acessos():
                     if vip_group.data:
                         vip_chat_id = vip_group.data["chat_id"]
                         try:
-                            await telegram_app.bot.ban_chat_member(chat_id=vip_chat_id, user_id=telegram_user_id)
-                            await telegram_app.bot.unban_chat_member(chat_id=vip_chat_id, user_id=telegram_user_id, only_if_banned=True)
+                            custom_token = await obter_token_bot_cliente(client_id)
+                            async with Bot(token=custom_token) as client_bot:
+                                await client_bot.ban_chat_member(chat_id=vip_chat_id, user_id=telegram_user_id)
+                                await client_bot.unban_chat_member(chat_id=vip_chat_id, user_id=telegram_user_id, only_if_banned=True)
                         except Exception as erro_remocao:
                             print(f"⚠️ ERRO REMOÇÃO {telegram_user_id}: {erro_remocao}")
 
                 supabase.table("access_control").update({
                     "status": "expirado",
                     "atualizado_em": agora.isoformat(),
-                }).eq("telegram_user_id", telegram_user_id).eq("client_id", acesso["client_id"]).execute()
+                }).eq("telegram_user_id", telegram_user_id).eq("client_id", client_id).execute()
 
         except Exception as erro:
             print(f"❌ ERRO VERIFICAR ACESSO: {erro}")
 
 
 # ============================================================
-# ONBOARDING DO ADMINISTRADOR (SUPORTE A MÚLTIPLOS PLANOS)
+# ONBOARDING DO ADMINISTRADOR
 # ============================================================
 
 async def cancelar_onboarding(update: Update, context):
     context.user_data.clear()
-    mensagem = "❌ Configuração cancelada. Envie `/configurar` para reiniciar."
+    mensagem = "Configuração interrompida. Quando quiser reiniciar, basta digitar `/configurar`."
     if update.callback_query:
         await update.callback_query.answer()
-        await update.callback_query.message.reply_text(mensagem, parse_mode="Markdown")
+        await update.callback_query.message.reply_text(mensagem)
     else:
-        await update.message.reply_text(mensagem, parse_mode="Markdown")
+        await update.message.reply_text(mensagem)
     return ConversationHandler.END
 
 
 async def iniciar_configuracao(update: Update, context):
     context.user_data["planos"] = []
-    
+
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🚀 Começar Configuração", callback_data="iniciar_onboarding")],
+        [InlineKeyboardButton("🚀 Iniciar Configuração", callback_data="iniciar_onboarding")],
         [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
     ])
 
     await update.message.reply_text(
-        "👋 **Seja bem-vindo ao assistente de configuração!**\n\n"
-        "Vamos configurar o seu bot e cadastrar seus planos de assinatura.\n"
-        "Clique no botão abaixo para iniciar.",
+        "👋 **Seja muito bem-vindo ao assistente de vendas!**\n\n"
+        "Vou te ajudar a configurar seu bot em poucos passos para você automatizar as vendas do seu canal VIP.\n\n"
+        "ℹ️ **Como funcionam as taxas:**\n"
+        "• **Taxa da Plataforma:** 5,00% por venda realizada (automatizado).\n"
+        "• **Taxa do Mercado Pago:** 0,99% para recebimentos via Pix instantâneo.\n\n"
+        "Vamos começar? Clique no botão abaixo:",
         reply_markup=keyboard,
         parse_mode="Markdown",
     )
@@ -357,8 +383,9 @@ async def passo1_nome_bot(update: Update, context):
     ])
 
     await query.message.reply_text(
-        "🏷️ **Passo 1 de 6: Nome do Bot**\n\n"
-        "Digite o **nome público** do seu Bot (Ex: *VIP Sinais Bot*):",
+        "🏷️ **Passo 1 de 6: Nome do seu Bot**\n\n"
+        "Como você gostaria de chamar o seu bot de vendas?\n"
+        "*(Exemplo: VIP Premium Bot, Canal de Sinais Bot)*",
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -373,8 +400,8 @@ async def receber_nome_bot(update: Update, context):
     ])
 
     await update.message.reply_text(
-        "🤖 **Passo 2 de 6: Token do Bot**\n\n"
-        "Cole aqui o **Bot Token** gerado pelo @BotFather:",
+        "🤖 **Passo 2 de 6: Token do Telegram**\n\n"
+        "Agora, por favor, envie o **Token do Bot** que você gerou no @BotFather:",
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -382,17 +409,31 @@ async def receber_nome_bot(update: Update, context):
 
 
 async def receber_token_bot(update: Update, context):
-    context.user_data["bot_token"] = update.message.text.strip()
+    token_inserido = update.message.text.strip()
+
+    try:
+        async with Bot(token=token_inserido) as temp_bot:
+            bot_info = await temp_bot.get_me()
+            context.user_data["bot_id"] = bot_info.id
+            context.user_data["bot_username"] = bot_info.username
+    except Exception:
+        await update.message.reply_text(
+            "❌ **Token inválido!** Por favor, verifique o token gerado no @BotFather e envie novamente:"
+        )
+        return AGUARDANDO_TOKEN_BOT
+
+    context.user_data["bot_token"] = token_inserido
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
     ])
 
     await update.message.reply_text(
-        "📦 **Passo 3 de 6: Produto/Apresentação**\n\n"
-        "Digite o **Nome do Grupo/Produto** e a **Mensagem de Boas-Vindas/Saudação**:\n\n"
-        "Exemplo:\n"
-        "`Sala VIP de Sinais - Bem-vindo! Escolha abaixo o melhor plano para você ter acesso aos sinais.`",
+        f"✅ Bot **@{bot_info.username}** validado com sucesso!\n\n"
+        "📝 **Passo 3 de 6: Apresentação do Produto**\n\n"
+        "Digite o **Nome do seu Produto** e uma **Mensagem de Boas-Vindas** para o seu cliente.\n\n"
+        "💡 *Você pode separar usando hífen (-), por exemplo:*\n"
+        "`Comunidade VIP - Seja muito bem-vindo! Escolha um dos planos abaixo para liberar seu acesso imediato.`",
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -408,7 +449,7 @@ async def receber_produto_info(update: Update, context):
         context.user_data["saudacao"] = partes[1].strip()
     else:
         context.user_data["produto_nome"] = texto
-        context.user_data["saudacao"] = "Seja bem-vindo ao nosso espaço VIP!"
+        context.user_data["saudacao"] = "Seja muito bem-vindo! Escolha o plano ideal para você:"
 
     return await exibir_menu_planos(update, context)
 
@@ -418,8 +459,8 @@ async def exibir_menu_planos(update: Update, context):
 
     resumo = ""
     if planos:
-        resumo = "📋 **Planos cadastrados até agora:**\n"
-        for idx, p in enumerate(planos, 1):
+        resumo = "📋 **Planos cadastrados até o momento:**\n"
+        for p in planos:
             resumo += f"• **Plano {p['tempo'].capitalize()}**: R$ {p['valor']:.2f}\n"
         resumo += "\n"
 
@@ -437,8 +478,8 @@ async def exibir_menu_planos(update: Update, context):
 
     msg_texto = (
         f"{resumo}"
-        "💰 **Configuração de Planos**\n\n"
-        "Selecione o tipo do plano que deseja adicionar à oferta:"
+        "💰 **Passo 4 de 6: Planos de Assinatura**\n\n"
+        "Selecione o período do plano que você deseja adicionar:"
     )
 
     if update.callback_query:
@@ -461,7 +502,8 @@ async def receber_selecao_plano(update: Update, context):
     ])
 
     await query.message.reply_text(
-        f"💲 Digite o valor para o **Plano {tempo_selecionado.capitalize()}** (Exemplo: `29.90`):",
+        f"💲 Qual o valor para o **Plano {tempo_selecionado.capitalize()}**?\n\n"
+        "*(Exemplo: `29.90`)*",
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -472,7 +514,7 @@ async def receber_valor_plano(update: Update, context):
     try:
         valor = float(update.message.text.replace(",", "."))
     except ValueError:
-        await update.message.reply_text("❌ Valor inválido. Digite um número ex: `29.90`:")
+        await update.message.reply_text("Por favor, informe um valor numérico válido (ex: `29.90`):")
         return AGUARDANDO_VALOR_PLANO
 
     tempo = context.user_data.pop("plano_em_edicao")
@@ -487,18 +529,18 @@ async def receber_valor_plano(update: Update, context):
     })
 
     planos = context.user_data["planos"]
-    resumo = "✅ **Plano Adicionado!**\n\n📋 **Planos Atuais:**\n"
+    resumo = "✅ **Plano Adicionado com sucesso!**\n\n📋 **Planos Configurados:**\n"
     for p in planos:
         resumo += f"• **{p['tempo'].capitalize()}**: R$ {p['valor']:.2f}\n"
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("➕ Adicionar outro plano", callback_data="add_mais_planos")],
+        [InlineKeyboardButton("➕ Adicionar Outro Plano", callback_data="add_mais_planos")],
         [InlineKeyboardButton("➡️ Avançar para Mídia", callback_data="avancar_midia")],
         [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
     ])
 
     await update.message.reply_text(
-        f"{resumo}\nDeseja cadastrar mais algum plano ou prosseguir?",
+        f"{resumo}\nDeseja cadastrar mais algum plano ou avançar?",
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -518,8 +560,9 @@ async def decisao_mais_planos(update: Update, context):
     ])
 
     await query.message.reply_text(
-        "🖼️ **Mídia Promocional (Opcional)**\n\n"
-        "Envie uma foto ou vídeo para a capa do `/start` ou clique em pular:",
+        "🖼️ **Passo 5 de 6: Mídia Promocional (Opcional)**\n\n"
+        "Envie uma foto ou vídeo para ser exibido junto com a oferta do seu bot.\n"
+        "Se preferir não colocar mídia agora, clique em **Pular Mídia**.",
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -537,11 +580,30 @@ async def receber_midia(update: Update, context):
         elif update.message.video:
             media_file_id = update.message.video.file_id
             media_type = "video"
-    elif update.callback_query:
-        await update.callback_query.answer()
+        
+        context.user_data["media_file_id"] = media_file_id
+        context.user_data["media_type"] = media_type
 
-    context.user_data["media_file_id"] = media_file_id
-    context.user_data["media_type"] = media_type
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("➡️ Avançar para Grupo VIP", callback_data="avancar_grupo_vip")],
+            [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
+        ])
+
+        await update.message.reply_text(
+            "✅ **Mídia recebida com sucesso!**\n\n"
+            "Clique no botão abaixo para prosseguir:",
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+        return AGUARDANDO_MIDIA
+
+    elif update.callback_query:
+        query = update.callback_query
+        await query.answer()
+
+        if query.data == "pular_midia":
+            context.user_data["media_file_id"] = None
+            context.user_data["media_type"] = None
 
     telegram_user_id = update.effective_user.id
     client_id = obter_ou_criar_cliente(telegram_user_id)
@@ -561,14 +623,15 @@ async def receber_midia(update: Update, context):
             ])
         botoes_grupos.append([InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")])
         keyboard = InlineKeyboardMarkup(botoes_grupos)
-        msg = "📢 **Passo 4 de 6: Vincular Grupo VIP**\n\nSelecione o canal de destino:"
+        msg = "📢 **Selecione o seu Canal/Grupo VIP de destino:**"
     else:
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
         ])
         msg = (
-            "📢 **Passo 4 de 6: Vincular Grupo VIP**\n\n"
-            "Envie o **ID do Chat/Canal VIP** (Ex: `-100123456789`):"
+            "📢 **Vincular Grupo/Canal VIP**\n\n"
+            "Por favor, envie o **ID do Canal/Grupo VIP** (Exemplo: `-100123456789`):\n\n"
+            "💡 *Dica: Adicione seu bot recém-cadastrado como Administrador do seu canal.*"
         )
 
     await (update.message or update.callback_query.message).reply_text(
@@ -602,17 +665,17 @@ async def receber_grupo_vip(update: Update, context):
         planos_txt += f"• **Plano {p['tempo'].capitalize()}**: R$ {p['valor']:.2f}\n"
 
     texto_revisao = (
-        "📋 **Passo 5 de 6: Revisão Final**\n\n"
+        "📋 **Revisão das Configurações**\n\n"
         f"🤖 **Nome do Bot:** {dados.get('bot_name')}\n"
         f"📦 **Produto:** {dados.get('produto_nome')}\n"
-        f"💬 **Saudação:** {dados.get('saudacao')}\n"
-        f"📢 **Grupo VIP ID:** {dados.get('vip_group_id')}\n\n"
-        f"💳 **Planos Configurados:**\n{planos_txt}\n"
-        "Confirme antes de concluir."
+        f"💬 **Mensagem:** {dados.get('saudacao')}\n"
+        f"🖼️ **Mídia Anexada:** {'Sim' if dados.get('media_file_id') else 'Não'}\n\n"
+        f"💳 **Planos Cadastrados:**\n{planos_txt}\n"
+        "Tudo correto? Clique no botão abaixo para salvar:"
     )
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🚀 CONCLUIR CONFIGURAÇÃO", callback_data="concluir_onboarding")],
+        [InlineKeyboardButton("✅ Confirmar e Salvar", callback_data="concluir_onboarding")],
         [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
     ])
 
@@ -646,11 +709,10 @@ async def concluir_configuracao(update: Update, context):
             "status": "active",
         }).execute()
 
-    bot_info = await context.bot.get_me()
     supabase.table("telegram_bots").upsert({
         "client_id": client_id,
-        "bot_id": bot_info.id,
-        "username": bot_info.username,
+        "bot_id": dados.get("bot_id"),
+        "username": dados.get("bot_username"),
         "bot_name": dados.get("bot_name"),
         "bot_token": dados.get("bot_token"),
         "status": "active"
@@ -667,14 +729,18 @@ async def concluir_configuracao(update: Update, context):
     link_mp = f"https://auth.mercadopago.com.br/authorization?{urlencode(params)}"
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("💳 Conectar Mercado Pago", url=link_mp)],
-        [InlineKeyboardButton("✅ Concluir Tudo", callback_data="finalizar_tudo")]
+        [InlineKeyboardButton("🔗 Conectar Mercado Pago", url=link_mp)],
+        [InlineKeyboardButton("✨ Finalizar e Concluir", callback_data="finalizar_tudo")]
     ])
 
     await query.message.reply_text(
         "🎉 **Configuração Salva com Sucesso!**\n\n"
-        "💳 **Passo 6 de 6: Vinculação do Mercado Pago**\n\n"
-        "Conecte sua conta do Mercado Pago para liberar o recebimento Pix automático:",
+        "💳 **Passo 6 de 6: Conectar Mercado Pago (Última Etapa)**\n\n"
+        "Para receber os pagamentos diretamente na sua conta bancária via Pix automatizado, "
+        "clique no botão abaixo para conectar seu Mercado Pago com segurança.\n\n"
+        "ℹ️ **Informação sobre taxas:**\n"
+        "• **Plataforma Bot:** 5% por venda efetuada.\n"
+        "• **Mercado Pago:** 0,99% por transação Pix.",
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -682,7 +748,7 @@ async def concluir_configuracao(update: Update, context):
 
 
 # ============================================================
-# FLUXO DO CLIENTE FINAL (/start COM MULTIPLOS BOTÕES)
+# FLUXO DO CLIENTE FINAL (/start)
 # ============================================================
 
 async def start(update: Update, context):
@@ -699,7 +765,7 @@ async def start(update: Update, context):
     )
 
     if not bot_data.data:
-        await update.message.reply_text("🤖 Bot ainda não configurado pelo administrador.")
+        await update.message.reply_text("👋 Este bot ainda está em fase de configuração.")
         return
 
     client_id = bot_data.data[0]["client_id"]
@@ -726,7 +792,7 @@ async def start(update: Update, context):
     texto_oferta = (
         f"{saudacao}\n\n"
         f"🌟 **{titulo}**\n\n"
-        "👇 Escolha o seu plano abaixo:"
+        "👇 Escolha abaixo o plano ideal para você:"
     )
 
     botoes_planos = []
@@ -755,7 +821,7 @@ async def botoes(update: Update, context):
     await query.answer()
 
     if query.data == "finalizar_tudo":
-        await query.message.reply_text("✨ Sistema pronto para operar.")
+        await query.message.reply_text("✨ Sistema 100% pronto e operacional!")
         return
 
     if query.data.startswith("comprar_"):
@@ -863,8 +929,8 @@ async def botoes(update: Update, context):
             await context.bot.send_message(
                 chat_id=query.from_user.id,
                 text=(
-                    f"💰 Pix gerado para o **Plano {str(produto['duration_type']).capitalize()}**!\n\n"
-                    "👇 Clique no botão abaixo para efetuar o pagamento:"
+                    f"💰 **Pix gerado para o Plano {str(produto['duration_type']).capitalize()}!**\n\n"
+                    "Clique no botão abaixo para efetuar o pagamento com segurança:"
                 ),
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("💳 Pagar via Pix", url=payment_url)]
@@ -877,7 +943,7 @@ async def botoes(update: Update, context):
             try:
                 await context.bot.send_message(
                     chat_id=query.from_user.id,
-                    text="❌ Não foi possível gerar o Pix agora. Tente novamente em instantes.",
+                    text="Por favor, tente novamente em alguns instantes.",
                 )
             except Exception:
                 pass
@@ -913,7 +979,7 @@ async def lifespan(app: FastAPI):
                 CallbackQueryHandler(decisao_mais_planos, pattern="^(add_mais_planos|avancar_midia)$"),
             ],
             AGUARDANDO_MIDIA: [
-                CallbackQueryHandler(receber_midia, pattern="^pular_midia$"),
+                CallbackQueryHandler(receber_midia, pattern="^(pular_midia|avancar_grupo_vip)$"),
                 MessageHandler(filters.PHOTO | filters.VIDEO, receber_midia),
             ],
             AGUARDANDO_GRUPO_VIP: [
@@ -955,7 +1021,7 @@ app = FastAPI(lifespan=lifespan)
 
 
 # ============================================================
-# ENDPOINTS HTTP (HOME, VERIFICAÇÃO, OAUTH & WEBHOOKS)
+# ENDPOINTS HTTP
 # ============================================================
 
 @app.get("/")
@@ -1218,20 +1284,26 @@ async def mercadopago_webhook(request: Request):
             )
 
             if vip_group.data:
-                invite = await telegram_app.bot.create_chat_invite_link(
-                    chat_id=vip_group.data["chat_id"],
-                    member_limit=1,
-                )
+                custom_token = await obter_token_bot_cliente(pagamento_atual["client_id"])
+                
+                async with Bot(token=custom_token) as client_bot:
+                    invite = await client_bot.create_chat_invite_link(
+                        chat_id=vip_group.data["chat_id"],
+                        member_limit=1,
+                    )
 
-                await telegram_app.bot.send_message(
-                    chat_id=telegram_user_id,
-                    text=(
-                        "✅ Pagamento aprovado!\n\n"
-                        "🎉 Seu acesso VIP está liberado!\n\n"
-                        "👇 Clique abaixo para entrar no grupo:\n"
-                        f"{invite.invite_link}"
-                    ),
-                )
+                    await client_bot.send_message(
+                        chat_id=telegram_user_id,
+                        text=(
+                            "✅ **Pagamento Aprovado!**\n\n"
+                            "🎉 Seu acesso VIP foi liberado com sucesso!\n\n"
+                            "Clique no botão abaixo para entrar no canal:"
+                        ),
+                        reply_markup=InlineKeyboardMarkup([
+                            [InlineKeyboardButton("🚀 Entrar no Canal VIP", url=invite.invite_link)]
+                        ]),
+                        parse_mode="Markdown"
+                    )
 
             supabase.table("payments").update({"invite_enviado": True}).eq("order_id", order_id).execute()
 
