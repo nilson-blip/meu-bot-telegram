@@ -1486,12 +1486,43 @@ async def oauth_callback(
             status_code=400,
         )
 
-    try:
-        client_id = int(state)
+        try:
+        telegram_user_id = int(state)
     except ValueError:
         return PlainTextResponse(
             "State OAuth inválido.",
             status_code=400,
+        )
+
+    try:
+        cliente = (
+            supabase.table("clients")
+            .select("id")
+            .eq(
+                "telegram_user_id",
+                telegram_user_id,
+            )
+            .single()
+            .execute()
+        )
+
+        if not cliente.data:
+            return PlainTextResponse(
+                "Cliente não encontrado.",
+                status_code=404,
+            )
+
+        client_id = cliente.data["id"]
+
+    except Exception as erro:
+        print(
+            "❌ ERRO AO LOCALIZAR CLIENTE OAUTH: "
+            f"{type(erro).__name__}: {erro}"
+        )
+
+        return PlainTextResponse(
+            "Erro ao localizar cliente.",
+            status_code=500,
         )
 
     if not MP_CLIENT_ID or not MP_CLIENT_SECRET:
