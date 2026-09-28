@@ -1568,27 +1568,35 @@ async def botoes(update: Update, context):
                 2
             )
 
-            # CORREÇÃO: Valores numéricos float puros para evitar 400 Bad Request no MP
+                        # CORREÇÃO: Conversão dos valores para string e ajuste do tipo de pagamento Pix
             order_data = {
                 "type": "online",
-                "total_amount": round(preco, 2),
+                "total_amount": f"{round(preco, 2):.2f}",
                 "external_reference": (
                     f"vip_{query.from_user.id}"
                 ),
                 "processing_mode": "manual",
                 "capture_mode": "automatic",
-                "marketplace_fee": round(marketplace_fee, 2),
+                "marketplace_fee": f"{round(marketplace_fee, 2):.2f}",
                 "transactions": {
                     "payments": [
                         {
-                            "amount": round(preco, 2),
+                            "amount": f"{round(preco, 2):.2f}",
                             "payment_method": {
                                 "id": "pix",
-                                "type": "bank_transfer",
+                                "type": "digital_currency", # Alterado de bank_transfer para digital_currency conforme exigência da API
                             },
                         }
                     ]
                 },
+                "payer": {
+                    "email": (
+                        f"user_{query.from_user.id}"
+                        "@telegram.com"
+                    )
+                },
+            }
+
                 "payer": {
                     "email": (
                         f"user_{query.from_user.id}"
