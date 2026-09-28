@@ -37,13 +37,10 @@ from telegram.error import TelegramError
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SECRET_KEY")
 
-# Token principal do Botchê / conta integradora.
 MP_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
-
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 MP_WEBHOOK_SECRET = os.getenv("MERCADOPAGO_WEBHOOK_SECRET")
 
-# Credenciais da aplicação Mercado Pago para OAuth.
 MP_CLIENT_ID = os.getenv("MERCADOPAGO_CLIENT_ID")
 MP_CLIENT_SECRET = os.getenv("MERCADOPAGO_CLIENT_SECRET")
 
@@ -53,28 +50,15 @@ MP_REDIRECT_URI = (
 )
 
 faltando = []
-
-if not SUPABASE_URL:
-    faltando.append("SUPABASE_URL")
-
-if not SUPABASE_KEY:
-    faltando.append("SUPABASE_SECRET_KEY")
-
-if not MP_TOKEN:
-    faltando.append("MERCADOPAGO_ACCESS_TOKEN")
-
-if not BOT_TOKEN:
-    faltando.append("BOT_TOKEN")
+if not SUPABASE_URL: faltando.append("SUPABASE_URL")
+if not SUPABASE_KEY: faltando.append("SUPABASE_SECRET_KEY")
+if not MP_TOKEN: faltando.append("MERCADOPAGO_ACCESS_TOKEN")
+if not BOT_TOKEN: faltando.append("BOT_TOKEN")
 
 if faltando:
-    raise RuntimeError(
-        "Variáveis ausentes: " + ", ".join(faltando)
-    )
+    raise RuntimeError("Variáveis ausentes: " + ", ".join(faltando))
 
-supabase: Client = create_client(
-    SUPABASE_URL,
-    SUPABASE_KEY
-)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 telegram_app: Application = (
     Application.builder()
@@ -85,30 +69,52 @@ telegram_app: Application = (
 
 
 # ============================================================
-# ESTADOS DO CONVERSATION HANDLER
+# ESTADOS DO CONVERSATION HANDLER (MÚLTIPLOS PLANOS)
 # ============================================================
 
 (
-    AGUARDANDO_TOKEN,
-    AGUARDANDO_SAUDACAO,
-    AGUARDANDO_PRODUTO_NOME,
-    AGUARDANDO_VALOR,
-    AGUARDANDO_TEMPO,
+    AGUARDANDO_NOME_BOT,
+    AGUARDANDO_TOKEN_BOT,
+    AGUARDANDO_PRODUTO_INFO,
+    AGUARDANDO_SELECAO_PLANO,
+    AGUARDANDO_VALOR_PLANO,
+    AGUARDANDO_DECISAO_MAIS_PLANOS,
     AGUARDANDO_MIDIA,
-) = range(6)
+    AGUARDANDO_GRUPO_VIP,
+    AGUARDANDO_REVISAO,
+) = range(9)
 
 
 # ============================================================
-# FUNÇÕES AUXILIARES
+# FUNÇÕES AUXILIARES DE BANCO
 # ============================================================
+
+def obter_ou_criar_cliente(telegram_user_id: int):
+    cliente = (
+        supabase.table("clients")
+        .select("id")
+        .eq("telegram_user_id", telegram_user_id)
+        .limit(1)
+        .execute()
+    )
+
+    if cliente.data:
+        return cliente.data[0]["id"]
+
+    novo_cliente = (
+        supabase.table("clients")
+        .insert({
+            "telegram_user_id": telegram_user_id,
+            "status": "active",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        .execute()
+    )
+    return novo_cliente.data[0]["id"]
+
 
 async def registrar_bot(client_id: int):
     bot_info = await telegram_app.bot.get_me()
-
-    print(
-        f"🤖 BOT IDENTIFICADO: "
-        f"{bot_info.id} | @{bot_info.username}"
-    )
 
     existente = (
         supabase.table("telegram_bots")
@@ -119,7 +125,6 @@ async def registrar_bot(client_id: int):
     )
 
     if existente.data:
-        print("ℹ️ BOT JÁ ESTÁ REGISTRADO.")
         return existente.data[0]["id"]
 
     resultado = (
@@ -134,15 +139,11 @@ async def registrar_bot(client_id: int):
         })
         .execute()
     )
-
-    print("🤖 BOT REGISTRADO NO SUPABASE.")
-
     return resultado.data[0]["id"]
 
 
 async def verificar_remarketing():
     agora = datetime.now(timezone.utc)
-
     pagamentos = (
         supabase.table("payments")
         .select("*")
@@ -152,55 +153,22 @@ async def verificar_remarketing():
     )
 
     if not pagamentos.data:
-        print(
-            "🔎 NENHUM PAGAMENTO PENDENTE PARA REMARKETING."
-        )
         return
-
-    print(
-        f"🔎 ENCONTRADOS {len(pagamentos.data)} "
-        "PAGAMENTOS PENDENTES PARA ANÁLISE."
-    )
 
     for pagamento in pagamentos.data:
         try:
-            created_at_str = pagamento["created_at"].replace(
-                "Z",
-                "+00:00"
-            )
-
-            criado_em = datetime.fromisoformat(
-                created_at_str
-            )
-
+            created_at_str = pagamento["created_at"].replace("Z", "+00:00")
+            criado_em = datetime.fromisoformat(created_at_str)
             if criado_em.tzinfo is None:
-                criado_em = criado_em.replace(
-                    tzinfo=timezone.utc
-                )
+                criado_em = criado_em.replace(tzinfo=timezone.utc)
 
-            minutos_passados = (
-                agora - criado_em
-            ).total_seconds() / 60
-
-            print(
-                f"⏱️ Pagamento ID {pagamento['id']}: "
-                f"{minutos_passados:.2f} minutos passados."
-            )
-
+            minutos_passados = (agora - criado_em).total_seconds() / 60
             if minutos_passados < 5:
                 continue
 
-            telegram_user_id = int(
-                pagamento["telegram_user_id"]
-            )
-
+            telegram_user_id = int(pagamento["telegram_user_id"])
             payment_url = pagamento.get("payment_url")
-
             if not payment_url:
-                print(
-                    f"⚠️ PAGAMENTO SEM LINK: "
-                    f"{pagamento['id']}"
-                )
                 continue
 
             await telegram_app.bot.send_message(
@@ -208,55 +176,19 @@ async def verificar_remarketing():
                 text=(
                     "⌛ Seu pagamento ainda não foi concluído.\n\n"
                     "Seu acesso VIP está esperando por você!\n\n"
-                    "👇 Se ainda quiser entrar, "
-                    "finalize o pagamento:"
+                    "👇 Se ainda quiser entrar, finalize o pagamento:"
                 ),
                 reply_markup=InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton(
-                            "💳 Finalizar pagamento",
-                            url=payment_url,
-                        )
-                    ]
+                    [InlineKeyboardButton("💳 Finalizar pagamento", url=payment_url)]
                 ]),
             )
 
-            supabase.table("payments").update({
-                "remarketing_enviado": True
-            }).eq(
-                "id",
-                pagamento["id"]
-            ).execute()
-
-            print(
-                "📲 REMARKETING ENVIADO COM SUCESSO PARA: "
-                f"{telegram_user_id}"
-            )
-
-        except TelegramError as e:
-            print(
-                "❌ ERRO DO TELEGRAM AO ENVIAR REMARKETING "
-                f"({pagamento.get('id')}): {e}"
-            )
-
-            supabase.table("payments").update({
-                "remarketing_enviado": True
-            }).eq(
-                "id",
-                pagamento["id"]
-            ).execute()
-
+            supabase.table("payments").update({"remarketing_enviado": True}).eq("id", pagamento["id"]).execute()
         except Exception as erro:
-            print(
-                "❌ ERRO GERAL NO REMARKETING: "
-                f"{pagamento.get('id')}: {erro}"
-            )
+            print(f"❌ ERRO REMARKETING: {erro}")
 
 
-async def registrar_acesso(
-    telegram_user_id: int,
-    payment_id: str,
-):
+async def registrar_acesso(telegram_user_id: int, payment_id: str):
     pagamento = (
         supabase.table("payments")
         .select("dias_acesso, client_id")
@@ -266,9 +198,7 @@ async def registrar_acesso(
     )
 
     if not pagamento.data:
-        raise RuntimeError(
-            "Pagamento não encontrado."
-        )
+        raise RuntimeError("Pagamento não encontrado.")
 
     dias_acesso = pagamento.data["dias_acesso"]
     client_id = pagamento.data["client_id"]
@@ -284,55 +214,19 @@ async def registrar_acesso(
 
     if existente:
         acesso = existente[0]
-
-        expiracao_atual = datetime.fromisoformat(
-            acesso["data_expiracao"].replace(
-                "Z",
-                "+00:00"
-            )
-        )
-
-        if expiracao_atual > agora:
-            nova_expiracao = (
-                expiracao_atual
-                + timedelta(days=dias_acesso)
-            )
-        else:
-            nova_expiracao = (
-                agora
-                + timedelta(days=dias_acesso)
-            )
+        expiracao_atual = datetime.fromisoformat(acesso["data_expiracao"].replace("Z", "+00:00"))
+        nova_expiracao = (expiracao_atual if expiracao_atual > agora else agora) + timedelta(days=dias_acesso)
 
         supabase.table("access_control").update({
             "payment_id": payment_id,
             "data_inicio": agora.isoformat(),
             "data_expiracao": nova_expiracao.isoformat(),
             "status": "ativo",
-            "aviso_10_enviado": False,
-            "aviso_5_enviado": False,
-            "aviso_3_enviado": False,
-            "aviso_2_enviado": False,
-            "aviso_1_enviado": False,
             "aviso_expiracao_enviado": False,
             "atualizado_em": agora.isoformat(),
-        }).eq(
-            "telegram_user_id",
-            telegram_user_id,
-        ).eq(
-            "client_id",
-            client_id,
-        ).execute()
-
-        print(
-            f"🔄 ACESSO RENOVADO: {telegram_user_id}"
-        )
-
+        }).eq("telegram_user_id", telegram_user_id).eq("client_id", client_id).execute()
     else:
-        nova_expiracao = (
-            agora
-            + timedelta(days=dias_acesso)
-        )
-
+        nova_expiracao = agora + timedelta(days=dias_acesso)
         supabase.table("access_control").insert({
             "telegram_user_id": telegram_user_id,
             "client_id": client_id,
@@ -340,68 +234,34 @@ async def registrar_acesso(
             "data_inicio": agora.isoformat(),
             "data_expiracao": nova_expiracao.isoformat(),
             "status": "ativo",
-            "aviso_10_enviado": False,
-            "aviso_5_enviado": False,
-            "aviso_3_enviado": False,
-            "aviso_2_enviado": False,
-            "aviso_1_enviado": False,
-            "aviso_expiracao_enviado": False,
             "criado_em": agora.isoformat(),
             "atualizado_em": agora.isoformat(),
         }).execute()
 
-        print(
-            f"🆕 ACESSO CRIADO: {telegram_user_id}"
-        )
-
 
 async def verificar_acessos():
     agora = datetime.now(timezone.utc)
-
-    acessos = (
-        supabase.table("access_control")
-        .select("*")
-        .eq("status", "ativo")
-        .execute()
-    )
+    acessos = supabase.table("access_control").select("*").eq("status", "ativo").execute()
 
     if not acessos.data:
-        print("🔎 NENHUM ACESSO ATIVO.")
         return
 
     for acesso in acessos.data:
         try:
-            telegram_user_id = acesso[
-                "telegram_user_id"
-            ]
+            telegram_user_id = acesso["telegram_user_id"]
+            data_expiracao = datetime.fromisoformat(acesso["data_expiracao"].replace("Z", "+00:00"))
 
-            data_expiracao = datetime.fromisoformat(
-                acesso["data_expiracao"].replace(
-                    "Z",
-                    "+00:00"
-                )
-            )
-
-            if (
-                data_expiracao - agora
-            ).total_seconds() <= 0:
-
+            if (data_expiracao - agora).total_seconds() <= 0:
                 pagamento = (
                     supabase.table("payments")
                     .select("vip_group_id")
-                    .eq(
-                        "id",
-                        acesso["payment_id"]
-                    )
+                    .eq("id", acesso["payment_id"])
                     .limit(1)
                     .execute()
                 )
 
                 if pagamento.data:
-                    vip_group_id = pagamento.data[0][
-                        "vip_group_id"
-                    ]
-
+                    vip_group_id = pagamento.data[0]["vip_group_id"]
                     vip_group = (
                         supabase.table("vip_groups")
                         .select("chat_id")
@@ -411,443 +271,400 @@ async def verificar_acessos():
                     )
 
                     if vip_group.data:
-                        vip_chat_id = vip_group.data[
-                            "chat_id"
-                        ]
-
+                        vip_chat_id = vip_group.data["chat_id"]
                         try:
-                            await telegram_app.bot.ban_chat_member(
-                                chat_id=vip_chat_id,
-                                user_id=telegram_user_id,
-                            )
-
-                            await telegram_app.bot.unban_chat_member(
-                                chat_id=vip_chat_id,
-                                user_id=telegram_user_id,
-                                only_if_banned=True,
-                            )
-
-                            print(
-                                "🚪 USUÁRIO REMOVIDO DO VIP: "
-                                f"{telegram_user_id}"
-                            )
-
+                            await telegram_app.bot.ban_chat_member(chat_id=vip_chat_id, user_id=telegram_user_id)
+                            await telegram_app.bot.unban_chat_member(chat_id=vip_chat_id, user_id=telegram_user_id, only_if_banned=True)
                         except Exception as erro_remocao:
-                            print(
-                                f"⚠️ ERRO AO REMOVER "
-                                f"{telegram_user_id}: "
-                                f"{erro_remocao}"
-                            )
+                            print(f"⚠️ ERRO REMOÇÃO {telegram_user_id}: {erro_remocao}")
 
-                supabase.table(
-                    "access_control"
-                ).update({
+                supabase.table("access_control").update({
                     "status": "expirado",
                     "atualizado_em": agora.isoformat(),
-                }).eq(
-                    "telegram_user_id",
-                    telegram_user_id,
-                ).eq(
-                    "client_id",
-                    acesso["client_id"],
-                ).execute()
-
-                print(
-                    f"⛔ ACESSO EXPIRADO: "
-                    f"{telegram_user_id}"
-                )
+                }).eq("telegram_user_id", telegram_user_id).eq("client_id", acesso["client_id"]).execute()
 
         except Exception as erro:
-            print(
-                "❌ ERRO AO VERIFICAR ACESSO: "
-                f"{acesso.get('telegram_user_id')}: "
-                f"{erro}"
-            )
+            print(f"❌ ERRO VERIFICAR ACESSO: {erro}")
 
 
 # ============================================================
-# ONBOARDING DO DONO
+# ONBOARDING DO ADMINISTRADOR (SUPORTE A MÚLTIPLOS PLANOS)
 # ============================================================
 
-async def iniciar_configuracao(
-    update: Update,
-    context,
-):
+async def cancelar_onboarding(update: Update, context):
+    context.user_data.clear()
+    mensagem = "❌ Configuração cancelada. Envie `/configurar` para reiniciar."
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.message.reply_text(mensagem, parse_mode="Markdown")
+    else:
+        await update.message.reply_text(mensagem, parse_mode="Markdown")
+    return ConversationHandler.END
+
+
+async def iniciar_configuracao(update: Update, context):
+    context.user_data["planos"] = []  # Inicializa lista de planos
+    
     keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "🚀 Começar Configuração",
-                callback_data="iniciar_onboarding",
-            )
-        ]
+        [InlineKeyboardButton("🚀 Começar Configuração", callback_data="iniciar_onboarding")],
+        [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
     ])
 
     await update.message.reply_text(
-        "👋 **Olá, seja bem-vindo!**\n\n"
-        "Vamos configurar seu bot de vendas VIP "
-        "em poucos minutos!\n"
-        "Clique no botão abaixo para começar.",
+        "👋 **Seja bem-vindo ao assistente de configuração!**\n\n"
+        "Vamos configurar o seu bot e cadastrar seus planos de assinatura.\n"
+        "Clique no botão abaixo para iniciar.",
         reply_markup=keyboard,
         parse_mode="Markdown",
     )
+    return AGUARDANDO_NOME_BOT
 
-    return AGUARDANDO_TOKEN
 
-
-async def solicitar_bot_token(
-    update: Update,
-    context,
-):
+async def passo1_nome_bot(update: Update, context):
     query = update.callback_query
-
     await query.answer()
 
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
+    ])
+
     await query.message.reply_text(
-        "🤖 **Passo 1 de 6: Bot Token**\n\n"
-        "Por favor, forneça o **Bot Token** do seu "
-        "bot do Telegram (criado no @BotFather):",
-        parse_mode="Markdown",
+        "🏷️ **Passo 1 de 6: Nome do Bot**\n\n"
+        "Digite o **nome público** do seu Bot (Ex: *VIP Sinais Bot*):",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    return AGUARDANDO_NOME_BOT
+
+
+async def receber_nome_bot(update: Update, context):
+    context.user_data["bot_name"] = update.message.text.strip()
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
+    ])
+
+    await update.message.reply_text(
+        "🤖 **Passo 2 de 6: Token do Bot**\n\n"
+        "Cole aqui o **Bot Token** gerado pelo @BotFather:",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    return AGUARDANDO_TOKEN_BOT
+
+
+async def receber_token_bot(update: Update, context):
+    context.user_data["bot_token"] = update.message.text.strip()
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
+    ])
+
+    await update.message.reply_text(
+        "📦 **Passo 3 de 6: Produto/Apresentação**\n\n"
+        "Digite o **Nome do Grupo/Produto** e a **Mensagem de Boas-Vindas/Saudação**:\n\n"
+        "Exemplo:\n"
+        "`Sala VIP de Sinais - Bem-vindo! Escolha abaixo o melhor plano para você ter acesso aos sinais.`",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    return AGUARDANDO_PRODUTO_INFO
+
+
+async def receber_produto_info(update: Update, context):
+    texto = update.message.text.strip()
+    partes = texto.split(" - ", 1)
+
+    if len(partes) == 2:
+        context.user_data["produto_nome"] = partes[0].strip()
+        context.user_data["saudacao"] = partes[1].strip()
+    else:
+        context.user_data["produto_nome"] = texto
+        context.user_data["saudacao"] = "Seja bem-vindo ao nosso espaço VIP!"
+
+    return await exibir_menu_planos(update, context)
+
+
+async def exibir_menu_planos(update: Update, context):
+    planos = context.user_data.get("planos", [])
+
+    resumo = ""
+    if planos:
+        resumo = "📋 **Planos cadastrados até agora:**\n"
+        for idx, p in enumerate(planos, 1):
+            resumo += f"• **Plano {p['tempo'].capitalize()}**: R$ {p['valor']:.2f}\n"
+        resumo += "\n"
+
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🗓 Semanal (7 dias)", callback_data="add_semanal"),
+            InlineKeyboardButton("🗓 Quinzenal (15 dias)", callback_data="add_quinzenal"),
+        ],
+        [
+            InlineKeyboardButton("🗓 Mensal (30 dias)", callback_data="add_mensal"),
+            InlineKeyboardButton("♾️ Vitalício", callback_data="add_vitalicio"),
+        ],
+        [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
+    ])
+
+    msg_texto = (
+        f"{resumo}"
+        "💰 **Configuração de Planos**\n\n"
+        "Selecione o tipo do plano que deseja adicionar à oferta:"
     )
 
-    return AGUARDANDO_TOKEN
+    if update.callback_query:
+        await update.callback_query.message.reply_text(msg_texto, reply_markup=keyboard, parse_mode="Markdown")
+    else:
+        await update.message.reply_text(msg_texto, reply_markup=keyboard, parse_mode="Markdown")
+
+    return AGUARDANDO_SELECAO_PLANO
 
 
-async def receber_bot_token(
-    update: Update,
-    context,
-):
-    bot_token = update.message.text.strip()
+async def receber_selecao_plano(update: Update, context):
+    query = update.callback_query
+    await query.answer()
 
-    context.user_data["bot_token"] = bot_token
+    tempo_selecionado = query.data.replace("add_", "")
+    context.user_data["plano_em_edicao"] = tempo_selecionado
 
-    if not MP_CLIENT_ID:
-        await update.message.reply_text(
-            "❌ O Mercado Pago ainda não está configurado "
-            "no servidor.\n\n"
-            "Falta a variável MERCADOPAGO_CLIENT_ID."
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
+    ])
+
+    await query.message.reply_text(
+        f"💲 Digite o valor para o **Plano {tempo_selecionado.capitalize()}** (Exemplo: `29.90`):",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    return AGUARDANDO_VALOR_PLANO
+
+
+async def receber_valor_plano(update: Update, context):
+    try:
+        valor = float(update.message.text.replace(",", "."))
+    except ValueError:
+        await update.message.reply_text("❌ Valor inválido. Digite um número ex: `29.90`:")
+        return AGUARDANDO_VALOR_PLANO
+
+    tempo = context.user_data.pop("plano_em_edicao")
+    
+    dias_map = {"semanal": 7, "quinzenal": 15, "mensal": 30, "vitalicio": 36500}
+    dias = dias_map.get(tempo, 30)
+
+    # Adiciona o plano na lista
+    context.user_data["planos"].append({
+        "tempo": tempo,
+        "valor": valor,
+        "dias": dias
+    })
+
+    planos = context.user_data["planos"]
+    resumo = "✅ **Plano Adicionado!**\n\n📋 **Planos Atuais:**\n"
+    for p in planos:
+        resumo += f"• **{p['tempo'].capitalize()}**: R$ {p['valor']:.2f}\n"
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("➕ Adicionar outro plano", callback_data="add_mais_planos")],
+        [InlineKeyboardButton("➡️ Avançar para Mídia", callback_data="avancar_midia")],
+        [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
+    ])
+
+    await update.message.reply_text(
+        f"{resumo}\nDeseja cadastrar mais algum plano ou prosseguir?",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    return AGUARDANDO_DECISAO_MAIS_PLANOS
+
+
+async def decisao_mais_planos(update: Update, context):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "add_mais_planos":
+        return await exibir_menu_planos(update, context)
+
+    # Avançar para Mídia
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⏩ Pular Mídia", callback_data="pular_midia")],
+        [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
+    ])
+
+    await query.message.reply_text(
+        "🖼️ **Mídia Promocional (Opcional)**\n\n"
+        "Envie uma foto ou vídeo para a capa do `/start` ou clique em pular:",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    return AGUARDANDO_MIDIA
+
+
+async def receber_midia(update: Update, context):
+    media_file_id = None
+    media_type = None
+
+    if update.message:
+        if update.message.photo:
+            media_file_id = update.message.photo[-1].file_id
+            media_type = "photo"
+        elif update.message.video:
+            media_file_id = update.message.video.file_id
+            media_type = "video"
+    elif update.callback_query:
+        await update.callback_query.answer()
+
+    context.user_data["media_file_id"] = media_file_id
+    context.user_data["media_type"] = media_type
+
+    telegram_user_id = update.effective_user.id
+    client_id = obter_ou_criar_cliente(telegram_user_id)
+
+    grupos = (
+        supabase.table("vip_groups")
+        .select("id, title, chat_id")
+        .eq("client_id", client_id)
+        .execute()
+    )
+
+    if grupos.data:
+        botoes_grupos = []
+        for g in grupos.data:
+            botoes_grupos.append([
+                InlineKeyboardButton(f"📢 {g['title']}", callback_data=f"selecionar_grupo_{g['id']}")
+            ])
+        botoes_grupos.append([InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")])
+        keyboard = InlineKeyboardMarkup(botoes_grupos)
+        msg = "📢 **Passo 4 de 6: Vincular Grupo VIP**\n\nSelecione o canal de destino:"
+    else:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
+        ])
+        msg = (
+            "📢 **Passo 4 de 6: Vincular Grupo VIP**\n\n"
+            "Envie o **ID do Chat/Canal VIP** (Ex: `-100123456789`):"
         )
-        return ConversationHandler.END
+
+    await (update.message or update.callback_query.message).reply_text(
+        msg, reply_markup=keyboard, parse_mode="Markdown"
+    )
+    return AGUARDANDO_GRUPO_VIP
+
+
+async def receber_grupo_vip(update: Update, context):
+    if update.callback_query:
+        query = update.callback_query
+        await query.answer()
+        vip_group_id = query.data.replace("selecionar_grupo_", "")
+        context.user_data["vip_group_id"] = vip_group_id
+    else:
+        chat_id_input = update.message.text.strip()
+        telegram_user_id = update.effective_user.id
+        client_id = obter_ou_criar_cliente(telegram_user_id)
+
+        res = supabase.table("vip_groups").upsert({
+            "client_id": client_id,
+            "chat_id": chat_id_input,
+            "title": "Canal VIP",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }).execute()
+        context.user_data["vip_group_id"] = res.data[0]["id"]
+
+    dados = context.user_data
+    planos_txt = ""
+    for p in dados.get("planos", []):
+        planos_txt += f"• **Plano {p['tempo'].capitalize()}**: R$ {p['valor']:.2f}\n"
+
+    texto_revisao = (
+        "📋 **Passo 5 de 6: Revisão Final**\n\n"
+        f"🤖 **Nome do Bot:** {dados.get('bot_name')}\n"
+        f"📦 **Produto:** {dados.get('produto_nome')}\n"
+        f"💬 **Saudação:** {dados.get('saudacao')}\n"
+        f"📢 **Grupo VIP ID:** {dados.get('vip_group_id')}\n\n"
+        f"💳 **Planos Configurados:**\n{planos_txt}\n"
+        "Confirme antes de concluir."
+    )
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🚀 CONCLUIR CONFIGURAÇÃO", callback_data="concluir_onboarding")],
+        [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
+    ])
+
+    await (update.message or update.callback_query.message).reply_text(
+        texto_revisao, reply_markup=keyboard, parse_mode="Markdown"
+    )
+    return AGUARDANDO_REVISAO
+
+
+async def concluir_configuracao(update: Update, context):
+    query = update.callback_query
+    await query.answer()
+
+    dados = context.user_data
+    telegram_user_id = update.effective_user.id
+    client_id = obter_ou_criar_cliente(telegram_user_id)
+
+    # Inativa produtos antigos deste cliente para dar lugar à nova esteira de planos
+    supabase.table("products").update({"status": "inactive"}).eq("client_id", client_id).execute()
+
+    # Salva todos os planos informados na tabela de produtos
+    for p in dados.get("planos", []):
+        supabase.table("products").insert({
+            "client_id": client_id,
+            "title": dados.get("produto_nome"),
+            "greeting_message": dados.get("saudacao"),
+            "price": p["valor"],
+            "duration_type": p["tempo"],
+            "duration_days": p["dias"],
+            "media_file_id": dados.get("media_file_id"),
+            "media_type": dados.get("media_type"),
+            "vip_group_id": dados.get("vip_group_id"),
+            "status": "active",
+        }).execute()
+
+    bot_info = await context.bot.get_me()
+    supabase.table("telegram_bots").upsert({
+        "client_id": client_id,
+        "bot_id": bot_info.id,
+        "username": bot_info.username,
+        "bot_name": dados.get("bot_name"),
+        "bot_token": dados.get("bot_token"),
+        "status": "active"
+    }).execute()
 
     params = {
         "client_id": MP_CLIENT_ID,
         "response_type": "code",
         "platform_id": "mp",
         "redirect_uri": MP_REDIRECT_URI,
-        "state": str(update.effective_user.id),
+        "state": str(telegram_user_id),
     }
 
-    link_mp = (
-        "https://auth.mercadopago.com.br/authorization?"
-        + urlencode(params)
-    )
+    link_mp = f"https://auth.mercadopago.com.br/authorization?{urlencode(params)}"
 
     keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "💳 Autorizar Mercado Pago",
-                url=link_mp,
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "✅ Já autorizei, continuar",
-                callback_data="mp_autorizado",
-            )
-        ],
-    ])
-
-    await update.message.reply_text(
-        "✅ Token registrado com sucesso!\n\n"
-        "💳 **Passo 2 de 6: Conectar Pagamentos**\n\n"
-        "Entre no Mercado Pago pelo botão abaixo "
-        "e autorize a integração:\n\n"
-        "ℹ️ **Transparência de Tarifas:**\n"
-        "• **Taxa da plataforma:** 5% por venda processada pelo bot.\n"
-        "• **Tarifa Mercado Pago:** ~0,99% referente à liquidação do Pix.\n\n"
-        "_O valor líquido das suas vendas entra direto na sua conta do Mercado Pago com o desconto automático no momento do repasse._",
-        reply_markup=keyboard,
-        parse_mode="Markdown",
-    )
-
-    return AGUARDANDO_SAUDACAO
-
-
-async def solicitar_saudacao(
-    update: Update,
-    context,
-):
-    query = update.callback_query
-
-    await query.answer()
-
-    await query.message.reply_text(
-        "💬 **Passo 3 de 6: Mensagem de Saudação**\n\n"
-        "Escreva a mensagem de boas-vindas que os "
-        "seus clientes vão receber ao dar `/start` "
-        "no seu bot:",
-        parse_mode="Markdown",
-    )
-
-    return AGUARDANDO_PRODUTO_NOME
-
-
-async def receber_saudacao(
-    update: Update,
-    context,
-):
-    context.user_data["saudacao"] = (
-        update.message.text.strip()
-    )
-
-    await update.message.reply_text(
-        "📦 **Passo 4 de 6: Apresentação do Produto**\n\n"
-        "Digite o **nome e a descrição** do seu "
-        "acesso VIP:",
-        parse_mode="Markdown",
-    )
-
-    return AGUARDANDO_VALOR
-
-
-async def receber_produto_nome(
-    update: Update,
-    context,
-):
-    context.user_data["produto_nome"] = (
-        update.message.text.strip()
-    )
-
-    await update.message.reply_text(
-        "💰 **Passo 5 de 6: Valor do Acesso**\n\n"
-        "Digite o valor do seu produto "
-        "(Exemplo: `49.90`):",
-        parse_mode="Markdown",
-    )
-
-    return AGUARDANDO_TEMPO
-
-
-async def receber_valor(
-    update: Update,
-    context,
-):
-    try:
-        valor = float(
-            update.message.text.replace(",", ".")
-        )
-
-        context.user_data["valor"] = valor
-
-    except ValueError:
-        await update.message.reply_text(
-            "❌ Valor inválido. Digite um número válido "
-            "ex: 49.90:"
-        )
-
-        return AGUARDANDO_VALOR
-
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "🗓 Semanal (7 dias)",
-                callback_data="tempo_semanal",
-            ),
-            InlineKeyboardButton(
-                "🗓 Quinzenal (15 dias)",
-                callback_data="tempo_quinzenal",
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                "🗓 Mensal (30 dias)",
-                callback_data="tempo_mensal",
-            ),
-            InlineKeyboardButton(
-                "♾️ Vitalício",
-                callback_data="tempo_vitalicio",
-            ),
-        ],
-    ])
-
-    await update.message.reply_text(
-        "⏳ **Plano / Duração**\n\n"
-        "Selecione o tempo de validade do plano "
-        "que aparecerá no botão do cliente:",
-        reply_markup=keyboard,
-        parse_mode="Markdown",
-    )
-
-    return AGUARDANDO_MIDIA
-
-
-async def receber_tempo(
-    update: Update,
-    context,
-):
-    query = update.callback_query
-
-    await query.answer()
-
-    tempo_selecionado = query.data.replace(
-        "tempo_",
-        "",
-    )
-
-    context.user_data["tempo"] = tempo_selecionado
-
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "⏩ Pular Mídia (Apenas texto)",
-                callback_data="pular_midia",
-            )
-        ]
+        [InlineKeyboardButton("💳 Conectar Mercado Pago", url=link_mp)],
+        [InlineKeyboardButton("✅ Concluir Tudo", callback_data="finalizar_tudo")]
     ])
 
     await query.message.reply_text(
-        "🖼️ **Passo 6 de 6: Foto ou Vídeo "
-        "(Opcional)**\n\n"
-        "Envie uma **foto ou vídeo** para ilustrar "
-        "a oferta ao seu cliente ou clique em pular:",
+        "🎉 **Configuração Salva com Sucesso!**\n\n"
+        "💳 **Passo 6 de 6: Vinculação do Mercado Pago**\n\n"
+        "Conecte sua conta do Mercado Pago para liberar o recebimento Pix automático:",
         reply_markup=keyboard,
-        parse_mode="Markdown",
+        parse_mode="Markdown"
     )
-
-    return AGUARDANDO_MIDIA
-
-
-async def finalizar_configuracao(
-    update: Update,
-    context,
-):
-    media_file_id = None
-    media_type = None
-
-    if update.message:
-        if update.message.photo:
-            media_file_id = (
-                update.message.photo[-1].file_id
-            )
-            media_type = "photo"
-
-        elif update.message.video:
-            media_file_id = (
-                update.message.video.file_id
-            )
-            media_type = "video"
-
-    elif update.callback_query:
-        await update.callback_query.answer()
-
-    dados = context.user_data
-
-    dias_map = {
-        "semanal": 7,
-        "quinzenal": 15,
-        "mensal": 30,
-        "vitalicio": 36500,
-    }
-
-    dias_acesso = dias_map.get(
-        dados.get("tempo"),
-        30,
-    )
-
-    client_id = update.effective_user.id
-
-    supabase.table("products").upsert({
-        "client_id": client_id,
-        "title": dados.get("produto_nome"),
-        "greeting_message": dados.get("saudacao"),
-        "price": dados.get("valor"),
-        "duration_type": dados.get("tempo"),
-        "duration_days": dias_acesso,
-        "media_file_id": media_file_id,
-        "media_type": media_type,
-        "status": "active",
-    }).execute()
-
-    await (
-        update.message
-        or update.callback_query.message
-    ).reply_text(
-        "🎉 **Configuração Concluída com Sucesso!**\n\n"
-        "Seu bot VIP está 100% configurado, pronto "
-        "para apresentar mídias, textos e gerar "
-        "pagamentos em Pix com Split automático!",
-        parse_mode="Markdown",
-    )
-
     return ConversationHandler.END
 
 
-async def capturar_novo_canal(
-    update: Update,
-    context,
-):
-    if not update.my_chat_member:
-        return
-
-    chat = update.my_chat_member.chat
-    chat_id_capturado = chat.id
-    chat_title = chat.title or "Canal VIP"
-
-    print(
-        "🎯 BOT ADICIONADO AO CANAL/GRUPO: "
-        f"{chat_title} ({chat_id_capturado})"
-    )
-
-    bot_info = await context.bot.get_me()
-
-    bot_data = (
-        supabase.table("telegram_bots")
-        .select("client_id")
-        .eq("username", bot_info.username)
-        .limit(1)
-        .execute()
-    )
-
-    if bot_data.data:
-        client_id = bot_data.data[0]["client_id"]
-
-        supabase.table("vip_groups").upsert({
-            "client_id": client_id,
-            "chat_id": str(chat_id_capturado),
-            "title": chat_title,
-            "created_at": datetime.now(
-                timezone.utc
-            ).isoformat(),
-        }).execute()
-
-        await context.bot.send_message(
-            chat_id=chat_id_capturado,
-            text=(
-                "✅ **Bot configurado com sucesso "
-                "neste canal!**\n\n"
-                "Agora estou pronto para gerenciar "
-                "as vendas e entradas dos membros."
-            ),
-            parse_mode="Markdown",
-        )
-
-
 # ============================================================
-# FLUXO DO CLIENTE FINAL
+# FLUXO DO CLIENTE FINAL (/start COM MULTIPLOS BOTÕES)
 # ============================================================
 
-async def start(
-    update: Update,
-    context,
-):
-    # Envia sinal explícito para o Telegram remover botões de rodapé/teclado personalizado
-    await update.message.reply_text(
-        "⏳ Carregando menu...",
-        reply_markup=ReplyKeyboardRemove()
-    )
+async def start(update: Update, context):
+    await update.message.reply_text("⏳ Carregando planos...", reply_markup=ReplyKeyboardRemove())
 
-    bot_username = (
-        await context.bot.get_me()
-    ).username
+    bot_username = (await context.bot.get_me()).username
 
     bot_data = (
         supabase.table("telegram_bots")
@@ -858,136 +675,89 @@ async def start(
     )
 
     if not bot_data.data:
-        await update.message.reply_text(
-            "🤖 Bot ainda não configurado "
-            "pelo administrador."
-        )
+        await update.message.reply_text("🤖 Bot ainda não configurado pelo administrador.")
         return
 
     client_id = bot_data.data[0]["client_id"]
 
-    produto_resultado = (
+    # Busca TODOS os planos ativos deste client_id
+    produtos = (
         supabase.table("products")
         .select("*")
         .eq("client_id", client_id)
         .eq("status", "active")
-        .limit(1)
         .execute()
     )
 
-    if not produto_resultado.data:
-        await update.message.reply_text(
-            "📋 Nenhum plano ativo disponível "
-            "no momento."
-        )
+    if not produtos.data:
+        await update.message.reply_text("📋 Nenhuma oferta disponível no momento.")
         return
 
-    prod = produto_resultado.data[0]
+    primeiro_prod = produtos.data[0]
+    saudacao = primeiro_prod.get("greeting_message") or "Seja bem-vindo!"
+    titulo = primeiro_prod.get("title") or "Acesso VIP Exclusivo"
 
-    saudacao = prod.get(
-        "greeting_message",
-        "Seja bem-vindo!",
-    )
-
-    titulo = prod.get(
-        "title",
-        "Acesso VIP Exclusivo",
-    )
-
-    preco = float(
-        prod.get("price", 0.0)
-    )
-
-    tempo = str(
-        prod.get(
-            "duration_type",
-            "mensal",
-        )
-    ).capitalize()
-
-    media_id = prod.get("media_file_id")
-    media_type = prod.get("media_type")
+    media_id = primeiro_prod.get("media_file_id")
+    media_type = primeiro_prod.get("media_type")
 
     texto_oferta = (
         f"{saudacao}\n\n"
         f"🌟 **{titulo}**\n\n"
-        "👇 Clique no botão abaixo para liberar "
-        "seu acesso instantâneo:"
+        "👇 Escolha o seu plano abaixo:"
     )
 
-    keyboard = InlineKeyboardMarkup([
-        [
+    # Monta um botão inline para cada plano cadastrado no banco
+    botoes_planos = []
+    for prod in produtos.data:
+        tempo = str(prod.get("duration_type", "mensal")).capitalize()
+        preco = float(prod.get("price", 0.0))
+        botoes_planos.append([
             InlineKeyboardButton(
                 f"⚡ Plano {tempo} - R$ {preco:.2f}",
-                callback_data=f"comprar_{prod['id']}",
+                callback_data=f"comprar_{prod['id']}"
             )
-        ]
-    ])
+        ])
+
+    keyboard = InlineKeyboardMarkup(botoes_planos)
 
     if media_id and media_type == "photo":
-        await update.message.reply_photo(
-            photo=media_id,
-            caption=texto_oferta,
-            reply_markup=keyboard,
-            parse_mode="Markdown",
-        )
-
+        await update.message.reply_photo(photo=media_id, caption=texto_oferta, reply_markup=keyboard, parse_mode="Markdown")
     elif media_id and media_type == "video":
-        await update.message.reply_video(
-            video=media_id,
-            caption=texto_oferta,
-            reply_markup=keyboard,
-            parse_mode="Markdown",
-        )
-
+        await update.message.reply_video(video=media_id, caption=texto_oferta, reply_markup=keyboard, parse_mode="Markdown")
     else:
-        await update.message.reply_text(
-            text=texto_oferta,
-            reply_markup=keyboard,
-            parse_mode="Markdown",
-        )
+        await update.message.reply_text(text=texto_oferta, reply_markup=keyboard, parse_mode="Markdown")
 
 
-async def botoes(
-    update: Update,
-    context,
-):
+async def botoes(update: Update, context):
     query = update.callback_query
-
     await query.answer()
 
-    if (
-        query.data.startswith("comprar_")
-        or query.data in ["comprar", "renovar"]
-    ):
-        try:
-            bot_username = (
-                await context.bot.get_me()
-            ).username
+    if query.data == "finalizar_tudo":
+        await query.message.reply_text("✨ Sistema pronto para operar.")
+        return
 
-            bot_data = (
-                supabase.table("telegram_bots")
-                .select("id, client_id")
-                .eq("username", bot_username)
-                .eq("status", "active")
-                .limit(1)
+    if query.data.startswith("comprar_"):
+        try:
+            product_id = query.data.replace("comprar_", "")
+
+            # Busca exatamente o plano clicado pelo cliente
+            produto_res = (
+                supabase.table("products")
+                .select("*")
+                .eq("id", product_id)
+                .single()
                 .execute()
             )
 
-            if not bot_data.data:
-                raise RuntimeError(
-                    "Bot Telegram não cadastrado."
-                )
+            if not produto_res.data:
+                raise RuntimeError("Plano não encontrado.")
 
-            client_id = bot_data.data[0][
-                "client_id"
-            ]
+            produto = produto_res.data
+            client_id = produto["client_id"]
 
             conexao = (
                 supabase.table("payment_connections")
-                .select(
-                    "id, access_token, fee_percentage"
-                )
+                .select("id, access_token, fee_percentage")
                 .eq("client_id", client_id)
                 .eq("status", "active")
                 .limit(1)
@@ -995,90 +765,35 @@ async def botoes(
             )
 
             if not conexao.data:
-                raise RuntimeError(
-                    "Nenhuma conexão de pagamento "
-                    "ativa encontrada."
-                )
+                raise RuntimeError("Nenhuma conexão de pagamento ativa encontrada.")
 
-            payment_connection_id = (
-                conexao.data[0]["id"]
-            )
+            payment_connection_id = conexao.data[0]["id"]
+            client_access_token = conexao.data[0].get("access_token") or MP_TOKEN
+            fee_percentage = float(conexao.data[0].get("fee_percentage") or 5.0)
 
-            client_access_token = (
-                conexao.data[0].get("access_token")
-                or MP_TOKEN
-            )
-
-            if not client_access_token:
-                raise RuntimeError(
-                    "Access Token do Mercado Pago "
-                    "não encontrado."
-                )
-
-            # Taxa da comissão ajustada para 5.0%
-            fee_percentage = float(
-                conexao.data[0].get(
-                    "fee_percentage"
-                )
-                or 5.0
-            )
-
-            produto_resultado = (
-                supabase.table("products")
-                .select("*")
-                .eq("client_id", client_id)
-                .eq("status", "active")
-                .limit(1)
-                .execute()
-            )
-
-            if not produto_resultado.data:
-                raise RuntimeError(
-                    "Nenhum produto ativo encontrado."
-                )
-
-            produto = produto_resultado.data[0]
-
-            produto_id = produto["id"]
             preco = float(produto["price"])
             dias_acesso = produto["duration_days"]
-            vip_group_id = produto.get(
-                "vip_group_id"
-            )
+            vip_group_id = produto.get("vip_group_id")
 
-            marketplace_fee = round(
-                preco
-                * (fee_percentage / 100.0),
-                2,
-            )
+            marketplace_fee = round(preco * (fee_percentage / 100.0), 2)
 
             headers = {
-                "Authorization": (
-                    f"Bearer {client_access_token}"
-                ),
+                "Authorization": f"Bearer {client_access_token}",
                 "Content-Type": "application/json",
-                "X-Idempotency-Key": str(
-                    uuid.uuid4()
-                ),
+                "X-Idempotency-Key": str(uuid.uuid4()),
             }
 
             order_data = {
                 "type": "online",
                 "total_amount": f"{preco:.2f}",
-                "external_reference": (
-                    f"vip_{query.from_user.id}"
-                ),
+                "external_reference": f"vip_{query.from_user.id}",
                 "processing_mode": "manual",
                 "capture_mode": "automatic",
-                "marketplace_fee": (
-                    f"{marketplace_fee:.2f}"
-                ),
+                "marketplace_fee": f"{marketplace_fee:.2f}",
                 "transactions": {
                     "payments": [
                         {
-                            "amount": (
-                                f"{preco:.2f}"
-                            ),
+                            "amount": f"{preco:.2f}",
                             "payment_method": {
                                 "id": "pix",
                                 "type": "bank_transfer",
@@ -1086,9 +801,7 @@ async def botoes(
                         }
                     ]
                 },
-                "payer": {
-                    "email": "cliente@email.com"
-                },
+                "payer": {"email": "cliente@email.com"},
             }
 
             async with httpx.AsyncClient(follow_redirects=True) as client:
@@ -1099,110 +812,51 @@ async def botoes(
                     timeout=20.0,
                 )
 
-            print(
-                "MERCADO PAGO:",
-                response.status_code,
-                response.text,
-            )
-
             response.raise_for_status()
-
             order = response.json()
 
-            payments = (
-                order.get("transactions", {})
-                .get("payments", [])
-            )
-
+            payments = order.get("transactions", {}).get("payments", [])
             if not payments:
-                raise RuntimeError(
-                    "Mercado Pago não retornou "
-                    "o pagamento da order."
-                )
+                raise RuntimeError("Mercado Pago não retornou o pagamento.")
 
             payment_data = payments[0]
-
-            payment_method = (
-                payment_data.get(
-                    "payment_method",
-                    {}
-                )
-            )
-
-            payment_url = (
-                payment_method.get("ticket_url")
-                or payment_method.get("external_resource_url")
-            )
-
+            payment_method = payment_data.get("payment_method", {})
+            payment_url = payment_method.get("ticket_url") or payment_method.get("external_resource_url")
             order_id = order.get("id")
-
-            if not order_id:
-                raise RuntimeError(
-                    "Mercado Pago não retornou "
-                    "o ID da order."
-                )
-
-            if not payment_url:
-                raise RuntimeError(
-                    "Mercado Pago não retornou "
-                    "o link do Pix."
-                )
 
             supabase.table("payments").insert({
                 "order_id": order_id,
-                "telegram_user_id": (
-                    query.from_user.id
-                ),
+                "telegram_user_id": query.from_user.id,
                 "amount": preco,
                 "status": "pending",
-                "external_reference": (
-                    order.get(
-                        "external_reference",
-                        f"vip_{query.from_user.id}",
-                    )
-                ),
+                "external_reference": order.get("external_reference", f"vip_{query.from_user.id}"),
                 "dias_acesso": dias_acesso,
-                "data_expiracao": None,
                 "payment_url": payment_url,
                 "remarketing_enviado": False,
-                "client_id": produto["client_id"],
-                "product_id": produto_id,
+                "client_id": client_id,
+                "product_id": product_id,
                 "vip_group_id": vip_group_id,
-                "payment_connection_id": (
-                    payment_connection_id
-                ),
+                "payment_connection_id": payment_connection_id,
             }).execute()
 
             await context.bot.send_message(
                 chat_id=query.from_user.id,
                 text=(
-                    "💰 Pix gerado com sucesso!\n\n"
-                    "👇 Clique no botão abaixo "
-                    "para concluir seu pagamento:"
+                    f"💰 Pix gerado para o **Plano {str(produto['duration_type']).capitalize()}**!\n\n"
+                    "👇 Clique no botão abaixo para efetuar o pagamento:"
                 ),
                 reply_markup=InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton(
-                            "💳 Pagar via Pix",
-                            url=payment_url,
-                        )
-                    ]
+                    [InlineKeyboardButton("💳 Pagar via Pix", url=payment_url)]
                 ]),
+                parse_mode="Markdown"
             )
 
         except Exception as erro:
-            print(
-                f"❌ ERRO AO GERAR PAGAMENTO: {erro}"
-            )
-
+            print(f"❌ ERRO AO GERAR PAGAMENTO: {erro}")
             try:
                 await context.bot.send_message(
                     chat_id=query.from_user.id,
-                    text=(
-                        "❌ Não foi possível gerar "
-                        "o pagamento agora.\n\n"
-                        "Tente novamente em alguns instantes."
-                    ),
+                    text="❌ Não foi possível gerar o Pix agora. Tente novamente em instantes.",
                 )
             except Exception:
                 pass
@@ -1216,104 +870,54 @@ async def botoes(
 async def lifespan(app: FastAPI):
 
     onboarding_handler = ConversationHandler(
-        entry_points=[
-            CommandHandler(
-                "configurar",
-                iniciar_configuracao,
-            )
-        ],
-
+        entry_points=[CommandHandler("configurar", iniciar_configuracao)],
         states={
-            AGUARDANDO_TOKEN: [
-                CallbackQueryHandler(
-                    solicitar_bot_token,
-                    pattern="^iniciar_onboarding$",
-                ),
-                MessageHandler(
-                    filters.TEXT & ~filters.COMMAND,
-                    receber_bot_token,
-                ),
+            AGUARDANDO_NOME_BOT: [
+                CallbackQueryHandler(passo1_nome_bot, pattern="^iniciar_onboarding$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receber_nome_bot),
             ],
-
-            AGUARDANDO_SAUDACAO: [
-                CallbackQueryHandler(
-                    solicitar_saudacao,
-                    pattern="^mp_autorizado$",
-                )
+            AGUARDANDO_TOKEN_BOT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receber_token_bot),
             ],
-
-            AGUARDANDO_PRODUTO_NOME: [
-                MessageHandler(
-                    filters.TEXT & ~filters.COMMAND,
-                    receber_saudacao,
-                )
+            AGUARDANDO_PRODUTO_INFO: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receber_produto_info),
             ],
-
-            AGUARDANDO_VALOR: [
-                MessageHandler(
-                    filters.TEXT & ~filters.COMMAND,
-                    receber_produto_nome,
-                )
+            AGUARDANDO_SELECAO_PLANO: [
+                CallbackQueryHandler(receber_selecao_plano, pattern="^add_"),
             ],
-
-            AGUARDANDO_TEMPO: [
-                MessageHandler(
-                    filters.TEXT & ~filters.COMMAND,
-                    receber_valor,
-                )
+            AGUARDANDO_VALOR_PLANO: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receber_valor_plano),
             ],
-
+            AGUARDANDO_DECISAO_MAIS_PLANOS: [
+                CallbackQueryHandler(decisao_mais_planos, pattern="^(add_mais_planos|avancar_midia)$"),
+            ],
             AGUARDANDO_MIDIA: [
-                CallbackQueryHandler(
-                    receber_tempo,
-                    pattern="^tempo_",
-                ),
-                CallbackQueryHandler(
-                    finalizar_configuracao,
-                    pattern="^pular_midia$",
-                ),
-                MessageHandler(
-                    filters.PHOTO | filters.VIDEO,
-                    finalizar_configuracao,
-                ),
+                CallbackQueryHandler(receber_midia, pattern="^pular_midia$"),
+                MessageHandler(filters.PHOTO | filters.VIDEO, receber_midia),
+            ],
+            AGUARDANDO_GRUPO_VIP: [
+                CallbackQueryHandler(receber_grupo_vip, pattern="^selecionar_grupo_"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receber_grupo_vip),
+            ],
+            AGUARDANDO_REVISAO: [
+                CallbackQueryHandler(concluir_configuracao, pattern="^concluir_onboarding$"),
             ],
         },
-
         fallbacks=[
-            CommandHandler(
-                "configurar",
-                iniciar_configuracao,
-            )
+            CommandHandler("cancelar", cancelar_onboarding),
+            CommandHandler("configurar", iniciar_configuracao),
+            CallbackQueryHandler(cancelar_onboarding, pattern="^cancelar_onboarding$"),
         ],
     )
 
-    telegram_app.add_handler(
-        onboarding_handler
-    )
-
-    telegram_app.add_handler(
-        CommandHandler("start", start)
-    )
-
-    telegram_app.add_handler(
-        CallbackQueryHandler(botoes)
-    )
-
-    telegram_app.add_handler(
-        ChatMemberHandler(
-            capturar_novo_canal,
-            ChatMemberHandler.MY_CHAT_MEMBER,
-        )
-    )
+    telegram_app.add_handler(onboarding_handler)
+    telegram_app.add_handler(CommandHandler("start", start))
+    telegram_app.add_handler(CallbackQueryHandler(botoes))
+    telegram_app.add_handler(ChatMemberHandler(capturar_novo_canal, ChatMemberHandler.MY_CHAT_MEMBER))
 
     await telegram_app.initialize()
     await telegram_app.start()
     await telegram_app.bot.initialize()
-
-    print(
-        "🤖 Telegram Bot e Aplicação "
-        "inicializados com sucesso."
-    )
 
     yield
 
@@ -1325,121 +929,49 @@ app = FastAPI(lifespan=lifespan)
 
 
 # ============================================================
-# HOME
+# ENDPOINTS HTTP (HOME, VERIFICAÇÃO, OAUTH & WEBHOOKS)
 # ============================================================
 
 @app.get("/")
 async def home():
-    return PlainTextResponse(
-        "Bot Mestre SaaS Online!"
-    )
+    return PlainTextResponse("Bot Mestre SaaS Online!")
 
-
-# ============================================================
-# REGISTRAR BOT
-# ============================================================
 
 @app.get("/registrar-bot")
-async def registrar_bot_endpoint(
-    request: Request,
-    client_id: int,
-):
-    cron_secret = os.getenv(
-        "CRON_SECRET"
-    )
+async def registrar_bot_endpoint(request: Request, client_id: int):
+    cron_secret = os.getenv("CRON_SECRET")
+    token = request.query_params.get("token")
 
-    token = request.query_params.get(
-        "token"
-    )
-
-    if (
-        not cron_secret
-        or token != cron_secret
-    ):
-        return PlainTextResponse(
-            "Não autorizado.",
-            status_code=401,
-        )
+    if not cron_secret or token != cron_secret:
+        return PlainTextResponse("Não autorizado.", status_code=401)
 
     try:
-        bot_id = await registrar_bot(
-            client_id
-        )
+        bot_id = await registrar_bot(client_id)
+        return PlainTextResponse(f"Bot registrado. ID: {bot_id}")
+    except Exception:
+        return PlainTextResponse("Erro ao registrar bot.", status_code=500)
 
-        return PlainTextResponse(
-            f"Bot registrado. ID: {bot_id}"
-        )
-
-    except Exception as e:
-        print(
-            "ERRO AO REGISTRAR BOT: "
-            f"{type(e).__name__}: {e}"
-        )
-
-        return PlainTextResponse(
-            "Erro ao registrar bot.",
-            status_code=500,
-        )
-
-
-# ============================================================
-# VERIFICAR ACESSOS
-# ============================================================
 
 @app.get("/verificar-acessos")
-async def verificar_acessos_endpoint(
-    request: Request,
-):
-    cron_secret = os.getenv(
-        "CRON_SECRET"
-    )
+async def verificar_acessos_endpoint(request: Request):
+    cron_secret = os.getenv("CRON_SECRET")
+    token = request.query_params.get("token")
 
-    token = request.query_params.get(
-        "token"
-    )
-
-    if (
-        not cron_secret
-        or token != cron_secret
-    ):
-        return PlainTextResponse(
-            "Não autorizado.",
-            status_code=401,
-        )
+    if not cron_secret or token != cron_secret:
+        return PlainTextResponse("Não autorizado.", status_code=401)
 
     try:
         await verificar_remarketing()
         await verificar_acessos()
+        return PlainTextResponse("Verificação executada.")
+    except Exception:
+        return PlainTextResponse("Erro na verificação.", status_code=500)
 
-        return PlainTextResponse(
-            "Verificação executada."
-        )
-
-    except Exception as e:
-        print(
-            "ERRO AO VERIFICAR ACESSOS: "
-            f"{type(e).__name__}: {e}"
-        )
-
-        return PlainTextResponse(
-            "Erro na verificação.",
-            status_code=500,
-        )
-
-
-# ============================================================
-# OAUTH MERCADO PAGO
-# ============================================================
 
 @app.get("/conectar-mercadopago")
-async def conectar_mercadopago(
-    client_id: int,
-):
+async def conectar_mercadopago(client_id: int):
     if not MP_CLIENT_ID:
-        return PlainTextResponse(
-            "MERCADOPAGO_CLIENT_ID não configurado.",
-            status_code=500,
-        )
+        return PlainTextResponse("MERCADOPAGO_CLIENT_ID não configurado.", status_code=500)
 
     params = {
         "client_id": MP_CLIENT_ID,
@@ -1449,87 +981,23 @@ async def conectar_mercadopago(
         "state": str(client_id),
     }
 
-    authorization_url = (
-        "https://auth.mercadopago.com.br/authorization?"
-        + urlencode(params)
-    )
-
-    return RedirectResponse(
-        url=authorization_url
-    )
+    return RedirectResponse(url="https://auth.mercadopago.com.br/authorization?" + urlencode(params))
 
 
 @app.get("/oauth/callback")
-async def oauth_callback(
-    request: Request,
-):
+async def oauth_callback(request: Request):
     code = request.query_params.get("code")
     state = request.query_params.get("state")
     error = request.query_params.get("error")
 
-    if error:
-        print("❌ OAUTH MERCADO PAGO:", error)
-        return PlainTextResponse(
-            f"Autorização cancelada: {error}",
-            status_code=400,
-        )
-
-    if not code:
-        return PlainTextResponse(
-            "Código OAuth não recebido.",
-            status_code=400,
-        )
-
-    if not state:
-        return PlainTextResponse(
-            "State OAuth não recebido.",
-            status_code=400,
-        )
+    if error or not code or not state:
+        return PlainTextResponse("Erro ou parâmetro ausente na autenticação OAuth.", status_code=400)
 
     try:
         telegram_user_id = int(state)
-    except ValueError:
-        return PlainTextResponse(
-            "State OAuth inválido.",
-            status_code=400,
-        )
-
-    try:
-        cliente = (
-            supabase.table("clients")
-            .select("id")
-            .eq(
-                "telegram_user_id",
-                telegram_user_id,
-            )
-            .single()
-            .execute()
-        )
-
-        if not cliente.data:
-            return PlainTextResponse(
-                "Cliente não encontrado.",
-                status_code=404,
-            )
-
-        client_id = cliente.data["id"]
-
-    except Exception as erro:
-        print(
-            "❌ ERRO AO LOCALIZAR CLIENTE OAUTH: "
-            f"{type(erro).__name__}: {erro}"
-        )
-
-        return PlainTextResponse(
-            "Erro ao localizar cliente.",
-            status_code=500,
-        )
-
-    if not MP_CLIENT_ID or not MP_CLIENT_SECRET:
-        return PlainTextResponse(
-            "MERCADOPAGO_CLIENT_ID ou MERCADOPAGO_CLIENT_SECRET ausente.",
-            status_code=500,
-        )
+        client_id = obter_ou_criar_cliente(telegram_user_id)
+    except Exception:
+        return PlainTextResponse("Erro ao identificar cliente.", status_code=500)
 
     try:
         oauth_data = {
@@ -1540,7 +1008,6 @@ async def oauth_callback(
             "redirect_uri": MP_REDIRECT_URI,
         }
 
-        # Ajuste de robustez no cliente Async HTTPX para evitar problemas com SSL/Proxy e Redirecionamentos no servidor
         async with httpx.AsyncClient(follow_redirects=True, verify=True) as client:
             response = await client.post(
                 "https://api.mercadopago.com/oauth/token",
@@ -1553,34 +1020,15 @@ async def oauth_callback(
                 timeout=30.0,
             )
 
-        print("OAUTH MERCADO PAGO STATUS:", response.status_code)
-
         if response.status_code != 200:
-            print("❌ RESPOSTA ERRO OAUTH:", response.text)
-            return PlainTextResponse(
-                f"Erro ao conectar o Mercado Pago ({response.status_code}). "
-                "Verifique os logs do servidor.",
-                status_code=400,
-            )
+            return PlainTextResponse("Erro na autorização do Mercado Pago.", status_code=400)
 
         oauth = response.json()
-
         access_token = oauth.get("access_token")
-        refresh_token = oauth.get("refresh_token")
-        public_key = oauth.get("public_key")
-        mp_user_id = oauth.get("user_id")
 
-        if not access_token:
-            print("❌ OAUTH SEM ACCESS TOKEN:", oauth)
-            return PlainTextResponse(
-                "Mercado Pago não retornou Access Token.",
-                status_code=400,
-            )
-
-        # Atualiza a comissão padrão para 5%
         conexao_existente = (
             supabase.table("payment_connections")
-            .select("id, fee_percentage")
+            .select("id")
             .eq("client_id", client_id)
             .limit(1)
             .execute()
@@ -1590,133 +1038,48 @@ async def oauth_callback(
             "client_id": client_id,
             "provider": "mercadopago",
             "access_token": access_token,
-            "refresh_token": refresh_token,
-            "mp_user_id": str(mp_user_id) if mp_user_id is not None else None,
-            "public_key": public_key,
+            "refresh_token": oauth.get("refresh_token"),
+            "mp_user_id": str(oauth.get("user_id")),
+            "public_key": oauth.get("public_key"),
             "fee_percentage": 5,
             "status": "active",
         }
 
         if conexao_existente.data:
-            (
-                supabase.table("payment_connections")
-                .update({
-                    "access_token": access_token,
-                    "refresh_token": refresh_token,
-                    "mp_user_id": str(mp_user_id) if mp_user_id is not None else None,
-                    "public_key": public_key,
-                    "fee_percentage": 5,
-                    "status": "active",
-                })
-                .eq("id", conexao_existente.data[0]["id"])
-                .execute()
-            )
-            connection_id = conexao_existente.data[0]["id"]
+            supabase.table("payment_connections").update(dados_conexao).eq("id", conexao_existente.data[0]["id"]).execute()
         else:
-            resultado = (
-                supabase.table("payment_connections")
-                .insert(dados_conexao)
-                .execute()
-            )
-            connection_id = (
-                resultado.data[0]["id"] if resultado.data else None
-            )
+            supabase.table("payment_connections").insert(dados_conexao).execute()
 
-        print(
-            "✅ MERCADO PAGO CONECTADO. "
-            f"CLIENTE: {client_id} | "
-            f"CONEXÃO: {connection_id} | "
-            f"MP USER: {mp_user_id}"
-        )
-
-        return PlainTextResponse(
-            "✅ Mercado Pago conectado com sucesso!\n\n"
-            "A conta foi vinculada ao sistema.\n"
-            "Você já pode fechar esta página e retornar ao Telegram."
-        )
+        return PlainTextResponse("✅ Mercado Pago conectado com sucesso! Pode fechar esta aba e retornar ao Telegram.")
 
     except Exception as erro:
-        print(f"❌ ERRO NO CALLBACK OAUTH: {type(erro).__name__}: {erro}")
-        return PlainTextResponse(
-            f"Erro ao concluir a conexão com o Mercado Pago: {type(erro).__name__}",
-            status_code=500,
-        )
+        return PlainTextResponse(f"Erro na conexão OAuth: {erro}", status_code=500)
 
-
-# ============================================================
-# WEBHOOK TELEGRAM
-# ============================================================
 
 @app.post("/telegram")
-async def telegram_webhook(
-    request: Request,
-):
+async def telegram_webhook(request: Request):
     try:
         data = await request.json()
-
-        update = Update.de_json(
-            data,
-            bot=telegram_app.bot,
-        )
-
-        await telegram_app.process_update(
-            update
-        )
-
+        update = Update.de_json(data, bot=telegram_app.bot)
+        await telegram_app.process_update(update)
         return PlainTextResponse("OK")
-
     except Exception as e:
-        print(
-            "ERRO NO WEBHOOK TELEGRAM: "
-            f"{type(e).__name__}: {e}"
-        )
+        return PlainTextResponse(f"Erro: {e}", status_code=500)
 
-        return PlainTextResponse(
-            f"Erro: {type(e).__name__}: {e}",
-            status_code=500,
-        )
-
-
-# ============================================================
-# WEBHOOK MERCADO PAGO
-# ============================================================
 
 @app.post("/mercadopago")
-async def mercadopago_webhook(
-    request: Request,
-):
+async def mercadopago_webhook(request: Request):
     try:
-        x_signature = request.headers.get(
-            "x-signature"
-        )
-
-        x_request_id = request.headers.get(
-            "x-request-id"
-        )
-
+        x_signature = request.headers.get("x-signature")
+        x_request_id = request.headers.get("x-request-id")
         data = await request.json()
-
-        print(
-            "WEBHOOK MERCADO PAGO:",
-            data,
-        )
 
         if data.get("type") != "order":
             return PlainTextResponse("OK")
 
-        order_data = data.get(
-            "data",
-            {}
-        )
-
-        order_id = order_data.get(
-            "id"
-        )
-
-        data_id = (
-            request.query_params.get("data.id")
-            or order_id
-        )
+        order_data = data.get("data", {})
+        order_id = order_data.get("id")
+        data_id = request.query_params.get("data.id") or order_id
 
         ts = None
         v1 = None
@@ -1724,351 +1087,133 @@ async def mercadopago_webhook(
         if x_signature:
             for part in x_signature.split(","):
                 part = part.strip()
+                if "=" in part:
+                    key, value = part.split("=", 1)
+                    if key.strip() == "ts":
+                        ts = value.strip()
+                    elif key.strip() == "v1":
+                        v1 = value.strip()
 
-                if "=" not in part:
-                    continue
+        manifest = f"id:{data_id};request-id:{x_request_id};ts:{ts};"
 
-                key, value = part.split(
-                    "=",
-                    1,
-                )
+        if not v1 or not MP_WEBHOOK_SECRET:
+            return PlainTextResponse("Invalid signature", status_code=401)
 
-                if key.strip() == "ts":
-                    ts = value.strip()
+        signature = hmac.new(MP_WEBHOOK_SECRET.encode(), manifest.encode(), hashlib.sha256).hexdigest()
 
-                elif key.strip() == "v1":
-                    v1 = value.strip()
-
-        manifest = (
-            f"id:{data_id};"
-            f"request-id:{x_request_id};"
-            f"ts:{ts};"
-        )
-
-        if (
-            not v1
-            or not MP_WEBHOOK_SECRET
-        ):
-            print(
-                "⚠️ ASSINATURA OU SECRET AUSENTE."
-            )
-
-            return PlainTextResponse(
-                "Invalid signature",
-                status_code=401,
-            )
-
-        signature = hmac.new(
-            MP_WEBHOOK_SECRET.encode(),
-            manifest.encode(),
-            hashlib.sha256,
-        ).hexdigest()
-
-        if not hmac.compare_digest(
-            signature,
-            v1,
-        ):
-            print(
-                "⚠️ ASSINATURA INVÁLIDA."
-            )
-
-            return PlainTextResponse(
-                "Invalid signature",
-                status_code=401,
-            )
+        if not hmac.compare_digest(signature, v1):
+            return PlainTextResponse("Invalid signature", status_code=401)
 
         if not order_id:
             return PlainTextResponse("OK")
 
-        print(
-            f"ORDER RECEBIDA: {order_id}"
-        )
-
         pagamento = (
             supabase.table("payments")
-            .select(
-                "id, status, invite_enviado, "
-                "client_id, vip_group_id, "
-                "product_id, payment_connection_id"
-            )
+            .select("id, status, invite_enviado, client_id, vip_group_id, product_id, payment_connection_id")
             .eq("order_id", order_id)
             .limit(1)
             .execute()
         )
 
         if not pagamento.data:
-            print(
-                "⚠️ PAGAMENTO NÃO ENCONTRADO "
-                "NO SUPABASE."
-            )
-
             return PlainTextResponse("OK")
 
         pagamento_atual = pagamento.data[0]
-
-        payment_connection_id = (
-            pagamento_atual.get(
-                "payment_connection_id"
-            )
-        )
-
+        payment_connection_id = pagamento_atual.get("payment_connection_id")
         order_access_token = None
 
         if payment_connection_id:
             conexao = (
-                supabase.table(
-                    "payment_connections"
-                )
+                supabase.table("payment_connections")
                 .select("access_token")
-                .eq(
-                    "id",
-                    payment_connection_id,
-                )
+                .eq("id", payment_connection_id)
                 .limit(1)
                 .execute()
             )
-
             if conexao.data:
-                order_access_token = (
-                    conexao.data[0].get(
-                        "access_token"
-                    )
-                )
+                order_access_token = conexao.data[0].get("access_token")
 
-        order_access_token = (
-            order_access_token
-            or MP_TOKEN
-        )
+        order_access_token = order_access_token or MP_TOKEN
 
-        if not order_access_token:
-            print(
-                "❌ ACCESS TOKEN NÃO ENCONTRADO "
-                "PARA CONSULTAR ORDER."
-            )
-
-            return PlainTextResponse(
-                "Token não encontrado",
-                status_code=500,
-            )
-
-        headers = {
-            "Authorization": (
-                f"Bearer {order_access_token}"
-            )
-        }
+        headers = {"Authorization": f"Bearer {order_access_token}"}
 
         async with httpx.AsyncClient(follow_redirects=True) as client:
-            response = await client.get(
-                (
-                    "https://api.mercadopago.com/"
-                    f"v1/orders/{order_id}"
-                ),
-                headers=headers,
-                timeout=20.0,
-            )
-
-        print(
-            "CONSULTA ORDER:",
-            response.status_code,
-        )
+            response = await client.get(f"https://api.mercadopago.com/v1/orders/{order_id}", headers=headers, timeout=20.0)
 
         response.raise_for_status()
-
         order = response.json()
-
         status = order.get("status")
-
-        external_reference = order.get(
-            "external_reference"
-        )
-
-        print(
-            f"STATUS: {status} | "
-            f"REFERÊNCIA: {external_reference}"
-        )
+        external_reference = order.get("external_reference")
 
         if status == "processed":
-
-            if (
-                not external_reference
-                or not external_reference.startswith(
-                    "vip_"
-                )
-            ):
-                print(
-                    "⚠️ REFERÊNCIA INVÁLIDA."
-                )
-
+            if not external_reference or not external_reference.startswith("vip_"):
                 return PlainTextResponse("OK")
 
-            telegram_user_id = int(
-                external_reference.replace(
-                    "vip_",
-                    "",
-                )
-            )
+            telegram_user_id = int(external_reference.replace("vip_", ""))
 
-            if pagamento_atual.get(
-                "invite_enviado"
-            ):
-                print(
-                    "⚠️ PAGAMENTO E CONVITE "
-                    "JÁ PROCESSADOS."
-                )
-
+            if pagamento_atual.get("invite_enviado"):
                 return PlainTextResponse("OK")
 
             produto = (
                 supabase.table("products")
                 .select("duration_days")
-                .eq(
-                    "id",
-                    pagamento_atual[
-                        "product_id"
-                    ],
-                )
+                .eq("id", pagamento_atual["product_id"])
                 .single()
                 .execute()
             )
 
-            if not produto.data:
-                print(
-                    "⚠️ PRODUTO NÃO ENCONTRADO."
-                )
-
-                return PlainTextResponse("OK")
-
-            dias_acesso = produto.data[
-                "duration_days"
-            ]
-
-            data_expiracao = (
-                datetime.now(timezone.utc)
-                + timedelta(days=dias_acesso)
-            )
+            dias_acesso = produto.data["duration_days"] if produto.data else 30
+            data_expiracao = datetime.now(timezone.utc) + timedelta(days=dias_acesso)
 
             supabase.table("payments").update({
                 "status": "approved",
-                "data_expiracao": (
-                    data_expiracao.isoformat()
-                ),
-            }).eq(
-                "order_id",
-                order_id,
-            ).execute()
+                "data_expiracao": data_expiracao.isoformat(),
+            }).eq("order_id", order_id).execute()
 
-            await registrar_acesso(
-                telegram_user_id,
-                pagamento_atual["id"],
-            )
+            await registrar_acesso(telegram_user_id, pagamento_atual["id"])
 
-            supabase.table(
-                "subscriptions"
-            ).insert({
-                "client_id": pagamento_atual[
-                    "client_id"
-                ],
-                "vip_group_id": pagamento_atual[
-                    "vip_group_id"
-                ],
-                "product_id": pagamento_atual[
-                    "product_id"
-                ],
+            supabase.table("subscriptions").insert({
+                "client_id": pagamento_atual["client_id"],
+                "vip_group_id": pagamento_atual["vip_group_id"],
+                "product_id": pagamento_atual["product_id"],
                 "telegram_user_id": telegram_user_id,
-                "payment_id": pagamento_atual[
-                    "id"
-                ],
+                "payment_id": pagamento_atual["id"],
                 "status": "active",
-                "started_at": datetime.now(
-                    timezone.utc
-                ).isoformat(),
-                "expires_at": (
-                    data_expiracao.isoformat()
-                ),
+                "started_at": datetime.now(timezone.utc).isoformat(),
+                "expires_at": data_expiracao.isoformat(),
             }).execute()
 
             vip_group = (
                 supabase.table("vip_groups")
                 .select("chat_id")
-                .eq(
-                    "id",
-                    pagamento_atual[
-                        "vip_group_id"
-                    ],
-                )
+                .eq("id", pagamento_atual["vip_group_id"])
                 .single()
                 .execute()
             )
 
-            if not vip_group.data:
-                print(
-                    "⚠️ GRUPO VIP NÃO ENCONTRADO."
-                )
-
-                return PlainTextResponse("OK")
-
-            invite = (
-                await telegram_app.bot
-                .create_chat_invite_link(
-                    chat_id=vip_group.data[
-                        "chat_id"
-                    ],
+            if vip_group.data:
+                invite = await telegram_app.bot.create_chat_invite_link(
+                    chat_id=vip_group.data["chat_id"],
                     member_limit=1,
                 )
-            )
 
-            await telegram_app.bot.send_message(
-                chat_id=telegram_user_id,
-                text=(
-                    "✅ Pagamento aprovado!\n\n"
-                    "🎉 Seu acesso VIP está liberado!\n\n"
-                    "👇 Clique abaixo para entrar "
-                    "no grupo:\n"
-                    f"{invite.invite_link}"
-                ),
-            )
+                await telegram_app.bot.send_message(
+                    chat_id=telegram_user_id,
+                    text=(
+                        "✅ Pagamento aprovado!\n\n"
+                        "🎉 Seu acesso VIP está liberado!\n\n"
+                        "👇 Clique abaixo para entrar no grupo:\n"
+                        f"{invite.invite_link}"
+                    ),
+                )
 
-            supabase.table(
-                "payments"
-            ).update({
-                "invite_enviado": True
-            }).eq(
-                "order_id",
-                order_id,
-            ).execute()
+            supabase.table("payments").update({"invite_enviado": True}).eq("order_id", order_id).execute()
 
-            print(
-                "🚀 ACESSO VIP ENVIADO COM SUCESSO!"
-            )
-
-        elif status in [
-            "failed",
-            "refunded",
-            "expired",
-        ]:
-            print(
-                "STATUS DE PAGAMENTO ATUALIZADO: "
-                f"{status}"
-            )
-
-            supabase.table(
-                "payments"
-            ).update({
-                "status": status
-            }).eq(
-                "order_id",
-                order_id,
-            ).execute()
+        elif status in ["failed", "refunded", "expired"]:
+            supabase.table("payments").update({"status": status}).eq("order_id", order_id).execute()
 
         return PlainTextResponse("OK")
 
     except Exception as e:
-        print(
-            "ERRO WEBHOOK MERCADO PAGO: "
-            f"{type(e).__name__}: {e}"
-        )
-
-        return PlainTextResponse(
-            "Erro",
-            status_code=500,
-        )
+        print(f"ERRO WEBHOOK MERCADO PAGO: {e}")
+        return PlainTextResponse("Erro", status_code=500)
