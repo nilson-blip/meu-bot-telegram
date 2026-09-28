@@ -978,9 +978,13 @@ async def botoes(update: Update, context):
             async with httpx.AsyncClient(follow_redirects=True) as client:
                 response = await client.post(
                     "https://api.mercadopago.com/v1/orders",
-                    headers=headers,
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "Content-Type": "application/json",
+                        "X-Idempotency-Key": str(uuid.uuid4()),
+                    },
                     json=order_data,
-                    timeout=20.0,
+                    timeout=30.0,
                 )
 
             if response.status_code != 200 and response.status_code != 201:
