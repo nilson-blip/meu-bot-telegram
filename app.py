@@ -17,6 +17,7 @@ from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     ReplyKeyboardRemove,
+    ChatMember,
 )
 from telegram.ext import (
     Application,
@@ -86,7 +87,7 @@ telegram_app: Application = (
 
 
 # ============================================================
-# FUNÇÕES AUXILIARES DE BANCO
+# FUNÇÕES AUXILIARES DE BANCO E HANDLERS DE CANAL
 # ============================================================
 
 def obter_ou_criar_cliente(telegram_user_id: int):
@@ -111,6 +112,33 @@ def obter_ou_criar_cliente(telegram_user_id: int):
         .execute()
     )
     return novo_cliente.data[0]["id"]
+
+
+async def capturar_novo_canal(update: Update, context):
+    """Função invocada quando o bot é adicionado a um canal ou grupo."""
+    result = update.my_chat_member
+    if not result:
+        return
+
+    chat = result.chat
+    new_status = result.new_chat_member.status
+    old_status = result.old_chat_member.status
+
+    # Se o bot foi promovido a administrador ou adicionado ao chat
+    if new_status in [ChatMember.ADMINISTRATOR, ChatMember.MEMBER] and old_status not in [ChatMember.ADMINISTRATOR, ChatMember.MEMBER]:
+        from_user_id = result.from_user.id
+        client_id = obter_ou_criar_cliente(from_user_id)
+
+        try:
+            supabase.table("vip_groups").upsert({
+                "client_id": client_id,
+                "chat_id": str(chat.id),
+                "title": chat.title or "Canal/Grupo VIP",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }).execute()
+            print(f"✅ Grupo/Canal '{chat.title}' (ID: {chat.id}) vinculado ao cliente {client_id}")
+        except Exception as e:
+            print(f"❌ Erro ao registrar canal no Supabase: {e}")
 
 
 async def registrar_bot(client_id: int):
@@ -303,7 +331,7 @@ async def cancelar_onboarding(update: Update, context):
 
 
 async def iniciar_configuracao(update: Update, context):
-    context.user_data["planos"] = []  # Inicializa lista de planos
+    context.user_data["planos"] = []
     
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🚀 Começar Configuração", callback_data="iniciar_onboarding")],
@@ -452,7 +480,6 @@ async def receber_valor_plano(update: Update, context):
     dias_map = {"semanal": 7, "quinzenal": 15, "mensal": 30, "vitalicio": 36500}
     dias = dias_map.get(tempo, 30)
 
-    # Adiciona o plano na lista
     context.user_data["planos"].append({
         "tempo": tempo,
         "valor": valor,
@@ -485,7 +512,6 @@ async def decisao_mais_planos(update: Update, context):
     if query.data == "add_mais_planos":
         return await exibir_menu_planos(update, context)
 
-    # Avançar para Mídia
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("⏩ Pular Mídia", callback_data="pular_midia")],
         [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
@@ -604,10 +630,8 @@ async def concluir_configuracao(update: Update, context):
     telegram_user_id = update.effective_user.id
     client_id = obter_ou_criar_cliente(telegram_user_id)
 
-    # Inativa produtos antigos deste cliente para dar lugar à nova esteira de planos
     supabase.table("products").update({"status": "inactive"}).eq("client_id", client_id).execute()
 
-    # Salva todos os planos informados na tabela de produtos
     for p in dados.get("planos", []):
         supabase.table("products").insert({
             "client_id": client_id,
@@ -680,7 +704,6 @@ async def start(update: Update, context):
 
     client_id = bot_data.data[0]["client_id"]
 
-    # Busca TODOS os planos ativos deste client_id
     produtos = (
         supabase.table("products")
         .select("*")
@@ -706,7 +729,6 @@ async def start(update: Update, context):
         "👇 Escolha o seu plano abaixo:"
     )
 
-    # Monta um botão inline para cada plano cadastrado no banco
     botoes_planos = []
     for prod in produtos.data:
         tempo = str(prod.get("duration_type", "mensal")).capitalize()
@@ -740,7 +762,6 @@ async def botoes(update: Update, context):
         try:
             product_id = query.data.replace("comprar_", "")
 
-            # Busca exatamente o plano clicado pelo cliente
             produto_res = (
                 supabase.table("products")
                 .select("*")
@@ -914,11 +935,11 @@ async def lifespan(app: FastAPI):
     telegram_app.add_handler(CommandHandler("start", start))
     telegram_app.add_handler(CallbackQueryHandler(botoes))
     telegram_app.add_handler(
-    ChatMemberHandler(
-        callback=capturar_novo_canal,
-        chat_member_types=ChatMemberHandler.MY_CHAT_MEMBER
+        ChatMemberHandler(
+            capturar_novo_canal,
+            ChatMemberHandler.MY_CHAT_MEMBER
+        )
     )
-)
 
     await telegram_app.initialize()
     await telegram_app.start()
