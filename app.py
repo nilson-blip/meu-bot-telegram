@@ -913,7 +913,12 @@ async def lifespan(app: FastAPI):
     telegram_app.add_handler(onboarding_handler)
     telegram_app.add_handler(CommandHandler("start", start))
     telegram_app.add_handler(CallbackQueryHandler(botoes))
-    telegram_app.add_handler(ChatMemberHandler(capturar_novo_canal, ChatMemberHandler.MY_CHAT_MEMBER))
+    telegram_app.add_handler(
+    ChatMemberHandler(
+        callback=capturar_novo_canal,
+        chat_member_types=ChatMemberHandler.MY_CHAT_MEMBER
+    )
+)
 
     await telegram_app.initialize()
     await telegram_app.start()
