@@ -1046,6 +1046,11 @@ async def botoes(update: Update, context):
             produto = produto_res.data
             client_id = produto["client_id"]
 
+            # BUSCA O TOKEN DO BOT DO CLIENTE (BOT B) ESPECÍFICO DESTE PRODUTO
+            custom_token = await obter_token_bot_cliente(client_id)
+            if not custom_token:
+                custom_token = BOT_TOKEN  # Fallback apenas se não achar
+
             conexao = (
                 supabase.table("payment_connections")
                 .select("id, access_token, fee_percentage")
@@ -1077,7 +1082,8 @@ async def botoes(update: Update, context):
                     "last_name": query.from_user.last_name or "Telegram"
                 },
                 "external_reference": f"vip_{query.from_user.id}",
-                }
+                "marketplace_fee": round(marketplace_fee, 2) if marketplace_fee > 0 else 0.00
+            }
 
             async with httpx.AsyncClient(follow_redirects=True) as client:
                 response = await client.post(
@@ -1097,7 +1103,6 @@ async def botoes(update: Update, context):
             point_of_interaction = payment_json.get("point_of_interaction", {})
             transaction_data = point_of_interaction.get("transaction_data", {})
 
-            # Extração correta do Pix Copia e Cola e Link de Pagamento
             qr_code = transaction_data.get("qr_code")
             payment_url = transaction_data.get("ticket_url") or transaction_data.get("external_resource_url")
             order_id = str(payment_json.get("id"))
@@ -1117,8 +1122,7 @@ async def botoes(update: Update, context):
                 "payment_connection_id": payment_connection_id,
             }).execute()
 
-            custom_token = await obter_token_bot_cliente(client_id)
-
+            # ENVIA A MENSAGEM DO PIX USANDO EXATAMENTE O TOKEN DO BOT B (DO CLIENTE)
             async with Bot(token=custom_token) as client_bot:
                 msg_texto = (
                     f"💰 <b>Pix gerado para o Plano {html.escape(str(produto['duration_type']).capitalize())}!</b>\n\n"
@@ -1157,6 +1161,7 @@ async def botoes(update: Update, context):
                     )
             except Exception:
                 pass
+
 
 
 # ============================================================
