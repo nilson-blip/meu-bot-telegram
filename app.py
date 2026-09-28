@@ -3,6 +3,7 @@ import asyncio
 import hashlib
 import hmac
 import uuid
+import html
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
@@ -220,7 +221,7 @@ async def verificar_remarketing():
                 await client_bot.send_message(
                     chat_id=telegram_user_id,
                     text=(
-                        "⌛ **Ainda dá tempo de garantir sua vaga!**\n\n"
+                        "⌛ <b>Ainda dá tempo de garantir sua vaga!</b>\n\n"
                         "Notei que você gerou o Pix mas não concluiu o pagamento. "
                         "Seus dados e sua vaga no canal VIP estão reservados por tempo limitado.\n\n"
                         "Clique no botão abaixo para concluir:"
@@ -228,7 +229,7 @@ async def verificar_remarketing():
                     reply_markup=InlineKeyboardMarkup([
                         [InlineKeyboardButton("💳 Concluir Meu Acesso", url=payment_url)]
                     ]),
-                    parse_mode="Markdown"
+                    parse_mode="HTML"
                 )
 
             supabase.table("payments").update({"remarketing_enviado": True}).eq("id", pagamento["id"]).execute()
@@ -362,14 +363,14 @@ async def iniciar_configuracao(update: Update, context):
     ])
 
     await update.message.reply_text(
-        "👋 **Seja muito bem-vindo ao assistente de vendas!**\n\n"
+        "👋 <b>Seja muito bem-vindo ao assistente de vendas!</b>\n\n"
         "Vou te ajudar a configurar seu bot em poucos passos para você automatizar as vendas do seu canal VIP.\n\n"
-        "ℹ️ **Como funcionam as taxas:**\n"
-        "• **Taxa da Plataforma:** 5,00% por venda realizada (automatizado).\n"
-        "• **Taxa do Mercado Pago:** 0,99% para recebimentos via Pix instantâneo.\n\n"
+        "ℹ️ <b>Como funcionam as taxas:</b>\n"
+        "• <b>Taxa da Plataforma:</b> 5,00% por venda realizada (automatizado).\n"
+        "• <b>Taxa do Mercado Pago:</b> 0,99% para recebimentos via Pix instantâneo.\n\n"
         "Vamos começar? Clique no botão abaixo:",
         reply_markup=keyboard,
-        parse_mode="Markdown",
+        parse_mode="HTML",
     )
     return AGUARDANDO_NOME_BOT
 
@@ -383,11 +384,11 @@ async def passo1_nome_bot(update: Update, context):
     ])
 
     await query.message.reply_text(
-        "🏷️ **Passo 1 de 6: Nome do seu Bot**\n\n"
+        "🏷️ <b>Passo 1 de 6: Nome do seu Bot</b>\n\n"
         "Como você gostaria de chamar o seu bot de vendas?\n"
-        "*(Exemplo: VIP Premium Bot, Canal de Sinais Bot)*",
+        "<i>(Exemplo: VIP Premium Bot, Canal de Sinais Bot)</i>",
         reply_markup=keyboard,
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
     return AGUARDANDO_NOME_BOT
 
@@ -400,10 +401,10 @@ async def receber_nome_bot(update: Update, context):
     ])
 
     await update.message.reply_text(
-        "🤖 **Passo 2 de 6: Token do Telegram**\n\n"
-        "Agora, por favor, envie o **Token do Bot** que você gerou no @BotFather:",
+        "🤖 <b>Passo 2 de 6: Token do Telegram</b>\n\n"
+        "Agora, por favor, envie o <b>Token do Bot</b> que você gerou no @BotFather:",
         reply_markup=keyboard,
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
     return AGUARDANDO_TOKEN_BOT
 
@@ -412,30 +413,38 @@ async def receber_token_bot(update: Update, context):
     token_inserido = update.message.text.strip()
 
     try:
-        async with Bot(token=token_inserido) as temp_bot:
-            bot_info = await temp_bot.get_me()
-            context.user_data["bot_id"] = bot_info.id
-            context.user_data["bot_username"] = bot_info.username
-    except Exception:
+        # Inicializa o bot temporário corretamente para evitar falha de sessão HTTP
+        temp_bot = Bot(token=token_inserido)
+        await temp_bot.initialize()
+        bot_info = await temp_bot.get_me()
+        await temp_bot.shutdown()
+
+        context.user_data["bot_id"] = bot_info.id
+        context.user_data["bot_username"] = bot_info.username
+        context.user_data["bot_token"] = token_inserido
+    except Exception as e:
+        print(f"❌ Erro ao validar token: {e}")
         await update.message.reply_text(
-            "❌ **Token inválido!** Por favor, verifique o token gerado no @BotFather e envie novamente:"
+            "❌ <b>Token inválido!</b> Por favor, verifique o token gerado no @BotFather e envie novamente:",
+            parse_mode="HTML"
         )
         return AGUARDANDO_TOKEN_BOT
-
-    context.user_data["bot_token"] = token_inserido
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
     ])
 
+    # Usamos html.escape para garantir que nomes com caracteres especiais não façam o parse falhar
+    username_limpo = html.escape(bot_info.username or "")
+
     await update.message.reply_text(
-        f"✅ Bot **@{bot_info.username}** validado com sucesso!\n\n"
-        "📝 **Passo 3 de 6: Apresentação do Produto**\n\n"
-        "Digite o **Nome do seu Produto** e uma **Mensagem de Boas-Vindas** para o seu cliente.\n\n"
-        "💡 *Você pode separar usando hífen (-), por exemplo:*\n"
-        "`Comunidade VIP - Seja muito bem-vindo! Escolha um dos planos abaixo para liberar seu acesso imediato.`",
+        f"✅ Bot <b>@{username_limpo}</b> validado com sucesso!\n\n"
+        "📝 <b>Passo 3 de 6: Apresentação do Produto</b>\n\n"
+        "Digite o <b>Nome do seu Produto</b> e uma <b>Mensagem de Boas-Vindas</b> para o seu cliente.\n\n"
+        "💡 <i>Você pode separar usando hífen (-), por exemplo:</i>\n"
+        "<code>Comunidade VIP - Seja muito bem-vindo! Escolha um dos planos abaixo para liberar seu acesso imediato.</code>",
         reply_markup=keyboard,
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
     return AGUARDANDO_PRODUTO_INFO
 
@@ -459,9 +468,9 @@ async def exibir_menu_planos(update: Update, context):
 
     resumo = ""
     if planos:
-        resumo = "📋 **Planos cadastrados até o momento:**\n"
+        resumo = "📋 <b>Planos cadastrados até o momento:</b>\n"
         for p in planos:
-            resumo += f"• **Plano {p['tempo'].capitalize()}**: R$ {p['valor']:.2f}\n"
+            resumo += f"• <b>Plano {html.escape(p['tempo'].capitalize())}</b>: R$ {p['valor']:.2f}\n"
         resumo += "\n"
 
     keyboard = InlineKeyboardMarkup([
@@ -478,14 +487,14 @@ async def exibir_menu_planos(update: Update, context):
 
     msg_texto = (
         f"{resumo}"
-        "💰 **Passo 4 de 6: Planos de Assinatura**\n\n"
+        "💰 <b>Passo 4 de 6: Planos de Assinatura</b>\n\n"
         "Selecione o período do plano que você deseja adicionar:"
     )
 
     if update.callback_query:
-        await update.callback_query.message.reply_text(msg_texto, reply_markup=keyboard, parse_mode="Markdown")
+        await update.callback_query.message.reply_text(msg_texto, reply_markup=keyboard, parse_mode="HTML")
     else:
-        await update.message.reply_text(msg_texto, reply_markup=keyboard, parse_mode="Markdown")
+        await update.message.reply_text(msg_texto, reply_markup=keyboard, parse_mode="HTML")
 
     return AGUARDANDO_SELECAO_PLANO
 
@@ -502,10 +511,10 @@ async def receber_selecao_plano(update: Update, context):
     ])
 
     await query.message.reply_text(
-        f"💲 Qual o valor para o **Plano {tempo_selecionado.capitalize()}**?\n\n"
-        "*(Exemplo: `29.90`)*",
+        f"💲 Qual o valor para o <b>Plano {html.escape(tempo_selecionado.capitalize())}</b>?\n\n"
+        "<i>(Exemplo: <code>29.90</code>)</i>",
         reply_markup=keyboard,
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
     return AGUARDANDO_VALOR_PLANO
 
@@ -514,7 +523,7 @@ async def receber_valor_plano(update: Update, context):
     try:
         valor = float(update.message.text.replace(",", "."))
     except ValueError:
-        await update.message.reply_text("Por favor, informe um valor numérico válido (ex: `29.90`):")
+        await update.message.reply_text("Por favor, informe um valor numérico válido (ex: <code>29.90</code>):", parse_mode="HTML")
         return AGUARDANDO_VALOR_PLANO
 
     tempo = context.user_data.pop("plano_em_edicao")
@@ -529,9 +538,9 @@ async def receber_valor_plano(update: Update, context):
     })
 
     planos = context.user_data["planos"]
-    resumo = "✅ **Plano Adicionado com sucesso!**\n\n📋 **Planos Configurados:**\n"
+    resumo = "✅ <b>Plano Adicionado com sucesso!</b>\n\n📋 <b>Planos Configurados:</b>\n"
     for p in planos:
-        resumo += f"• **{p['tempo'].capitalize()}**: R$ {p['valor']:.2f}\n"
+        resumo += f"• <b>{html.escape(p['tempo'].capitalize())}</b>: R$ {p['valor']:.2f}\n"
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("➕ Adicionar Outro Plano", callback_data="add_mais_planos")],
@@ -542,7 +551,7 @@ async def receber_valor_plano(update: Update, context):
     await update.message.reply_text(
         f"{resumo}\nDeseja cadastrar mais algum plano ou avançar?",
         reply_markup=keyboard,
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
     return AGUARDANDO_DECISAO_MAIS_PLANOS
 
@@ -560,11 +569,11 @@ async def decisao_mais_planos(update: Update, context):
     ])
 
     await query.message.reply_text(
-        "🖼️ **Passo 5 de 6: Mídia Promocional (Opcional)**\n\n"
+        "🖼️ <b>Passo 5 de 6: Mídia Promocional (Opcional)</b>\n\n"
         "Envie uma foto ou vídeo para ser exibido junto com a oferta do seu bot.\n"
-        "Se preferir não colocar mídia agora, clique em **Pular Mídia**.",
+        "Se preferir não colocar mídia agora, clique em <b>Pular Mídia</b>.",
         reply_markup=keyboard,
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
     return AGUARDANDO_MIDIA
 
@@ -590,10 +599,10 @@ async def receber_midia(update: Update, context):
         ])
 
         await update.message.reply_text(
-            "✅ **Mídia recebida com sucesso!**\n\n"
+            "✅ <b>Mídia recebida com sucesso!</b>\n\n"
             "Clique no botão abaixo para prosseguir:",
             reply_markup=keyboard,
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         return AGUARDANDO_MIDIA
 
@@ -623,19 +632,19 @@ async def receber_midia(update: Update, context):
             ])
         botoes_grupos.append([InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")])
         keyboard = InlineKeyboardMarkup(botoes_grupos)
-        msg = "📢 **Selecione o seu Canal/Grupo VIP de destino:**"
+        msg = "📢 <b>Selecione o seu Canal/Grupo VIP de destino:</b>"
     else:
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
         ])
         msg = (
-            "📢 **Vincular Grupo/Canal VIP**\n\n"
-            "Por favor, envie o **ID do Canal/Grupo VIP** (Exemplo: `-100123456789`):\n\n"
-            "💡 *Dica: Adicione seu bot recém-cadastrado como Administrador do seu canal.*"
+            "📢 <b>Vincular Grupo/Canal VIP</b>\n\n"
+            "Por favor, envie o <b>ID do Canal/Grupo VIP</b> (Exemplo: <code>-100123456789</code>):\n\n"
+            "💡 <i>Dica: Adicione seu bot recém-cadastrado como Administrador do seu canal.</i>"
         )
 
     await (update.message or update.callback_query.message).reply_text(
-        msg, reply_markup=keyboard, parse_mode="Markdown"
+        msg, reply_markup=keyboard, parse_mode="HTML"
     )
     return AGUARDANDO_GRUPO_VIP
 
@@ -662,15 +671,19 @@ async def receber_grupo_vip(update: Update, context):
     dados = context.user_data
     planos_txt = ""
     for p in dados.get("planos", []):
-        planos_txt += f"• **Plano {p['tempo'].capitalize()}**: R$ {p['valor']:.2f}\n"
+        planos_txt += f"• <b>Plano {html.escape(p['tempo'].capitalize())}</b>: R$ {p['valor']:.2f}\n"
+
+    bot_name_safe = html.escape(str(dados.get('bot_name', '')))
+    prod_nome_safe = html.escape(str(dados.get('produto_nome', '')))
+    saudacao_safe = html.escape(str(dados.get('saudacao', '')))
 
     texto_revisao = (
-        "📋 **Revisão das Configurações**\n\n"
-        f"🤖 **Nome do Bot:** {dados.get('bot_name')}\n"
-        f"📦 **Produto:** {dados.get('produto_nome')}\n"
-        f"💬 **Mensagem:** {dados.get('saudacao')}\n"
-        f"🖼️ **Mídia Anexada:** {'Sim' if dados.get('media_file_id') else 'Não'}\n\n"
-        f"💳 **Planos Cadastrados:**\n{planos_txt}\n"
+        "📋 <b>Revisão das Configurações</b>\n\n"
+        f"🤖 <b>Nome do Bot:</b> {bot_name_safe}\n"
+        f"📦 <b>Produto:</b> {prod_nome_safe}\n"
+        f"💬 <b>Mensagem:</b> {saudacao_safe}\n"
+        f"🖼️ <b>Mídia Anexada:</b> {'Sim' if dados.get('media_file_id') else 'Não'}\n\n"
+        f"💳 <b>Planos Cadastrados:</b>\n{planos_txt}\n"
         "Tudo correto? Clique no botão abaixo para salvar:"
     )
 
@@ -680,7 +693,7 @@ async def receber_grupo_vip(update: Update, context):
     ])
 
     await (update.message or update.callback_query.message).reply_text(
-        texto_revisao, reply_markup=keyboard, parse_mode="Markdown"
+        texto_revisao, reply_markup=keyboard, parse_mode="HTML"
     )
     return AGUARDANDO_REVISAO
 
@@ -734,15 +747,15 @@ async def concluir_configuracao(update: Update, context):
     ])
 
     await query.message.reply_text(
-        "🎉 **Configuração Salva com Sucesso!**\n\n"
-        "💳 **Passo 6 de 6: Conectar Mercado Pago (Última Etapa)**\n\n"
+        "🎉 <b>Configuração Salva com Sucesso!</b>\n\n"
+        "💳 <b>Passo 6 de 6: Conectar Mercado Pago (Última Etapa)</b>\n\n"
         "Para receber os pagamentos diretamente na sua conta bancária via Pix automatizado, "
         "clique no botão abaixo para conectar seu Mercado Pago com segurança.\n\n"
-        "ℹ️ **Informação sobre taxas:**\n"
-        "• **Plataforma Bot:** 5% por venda efetuada.\n"
-        "• **Mercado Pago:** 0,99% por transação Pix.",
+        "ℹ️ <b>Informação sobre taxas:</b>\n"
+        "• <b>Plataforma Bot:</b> 5% por venda efetuada.\n"
+        "• <b>Mercado Pago:</b> 0,99% por transação Pix.",
         reply_markup=keyboard,
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
     return ConversationHandler.END
 
@@ -783,15 +796,15 @@ async def start(update: Update, context):
         return
 
     primeiro_prod = produtos.data[0]
-    saudacao = primeiro_prod.get("greeting_message") or "Seja bem-vindo!"
-    titulo = primeiro_prod.get("title") or "Acesso VIP Exclusivo"
+    saudacao = html.escape(primeiro_prod.get("greeting_message") or "Seja bem-vindo!")
+    titulo = html.escape(primeiro_prod.get("title") or "Acesso VIP Exclusivo")
 
     media_id = primeiro_prod.get("media_file_id")
     media_type = primeiro_prod.get("media_type")
 
     texto_oferta = (
         f"{saudacao}\n\n"
-        f"🌟 **{titulo}**\n\n"
+        f"🌟 <b>{titulo}</b>\n\n"
         "👇 Escolha abaixo o plano ideal para você:"
     )
 
@@ -809,11 +822,11 @@ async def start(update: Update, context):
     keyboard = InlineKeyboardMarkup(botoes_planos)
 
     if media_id and media_type == "photo":
-        await update.message.reply_photo(photo=media_id, caption=texto_oferta, reply_markup=keyboard, parse_mode="Markdown")
+        await update.message.reply_photo(photo=media_id, caption=texto_oferta, reply_markup=keyboard, parse_mode="HTML")
     elif media_id and media_type == "video":
-        await update.message.reply_video(video=media_id, caption=texto_oferta, reply_markup=keyboard, parse_mode="Markdown")
+        await update.message.reply_video(video=media_id, caption=texto_oferta, reply_markup=keyboard, parse_mode="HTML")
     else:
-        await update.message.reply_text(text=texto_oferta, reply_markup=keyboard, parse_mode="Markdown")
+        await update.message.reply_text(text=texto_oferta, reply_markup=keyboard, parse_mode="HTML")
 
 
 async def botoes(update: Update, context):
@@ -929,13 +942,13 @@ async def botoes(update: Update, context):
             await context.bot.send_message(
                 chat_id=query.from_user.id,
                 text=(
-                    f"💰 **Pix gerado para o Plano {str(produto['duration_type']).capitalize()}!**\n\n"
+                    f"💰 <b>Pix gerado para o Plano {html.escape(str(produto['duration_type']).capitalize())}!</b>\n\n"
                     "Clique no botão abaixo para efetuar o pagamento com segurança:"
                 ),
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("💳 Pagar via Pix", url=payment_url)]
                 ]),
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
 
         except Exception as erro:
@@ -1295,14 +1308,14 @@ async def mercadopago_webhook(request: Request):
                     await client_bot.send_message(
                         chat_id=telegram_user_id,
                         text=(
-                            "✅ **Pagamento Aprovado!**\n\n"
+                            "✅ <b>Pagamento Aprovado!</b>\n\n"
                             "🎉 Seu acesso VIP foi liberado com sucesso!\n\n"
                             "Clique no botão abaixo para entrar no canal:"
                         ),
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("🚀 Entrar no Canal VIP", url=invite.invite_link)]
                         ]),
-                        parse_mode="Markdown"
+                        parse_mode="HTML"
                     )
 
             supabase.table("payments").update({"invite_enviado": True}).eq("order_id", order_id).execute()
