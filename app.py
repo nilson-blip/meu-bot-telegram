@@ -1077,8 +1077,7 @@ async def botoes(update: Update, context):
                     "last_name": query.from_user.last_name or "Telegram"
                 },
                 "external_reference": f"vip_{query.from_user.id}",
-                "marketplace_fee": round(marketplace_fee, 2) if marketplace_fee > 0 else 0.00
-            }
+                }
 
             async with httpx.AsyncClient(follow_redirects=True) as client:
                 response = await client.post(
