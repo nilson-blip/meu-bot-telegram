@@ -181,36 +181,33 @@ def obter_bot_do_update(update: Update):
     )
 
 
-async def obter_token_bot_cliente(client_id: int) -> str:
-
-    bot_res = (
+async def obter_token_bot_cliente(client_id: int, token_atual: str = None) -> str:
+    query = (
         supabase.table("telegram_bots")
         .select("bot_token")
         .eq("client_id", client_id)
         .eq("status", "active")
-        .limit(1)
-        .execute()
     )
 
-    if (
-        bot_res.data
-        and bot_res.data[0].get("bot_token")
-    ):
+    # Se sabemos qual bot recebeu o Update,
+    # buscamos exatamente esse bot.
+    if token_atual:
+        query = query.eq("bot_token", token_atual)
 
+    bot_res = query.limit(1).execute()
+
+    if bot_res.data and bot_res.data[0].get("bot_token"):
         token = bot_res.data[0]["bot_token"]
 
         if token == BOT_TOKEN:
-
             raise RuntimeError(
-                "O bot do cliente está usando o mesmo "
-                "token do Botchê principal."
+                "O bot encontrado é o Botchê principal."
             )
 
         return token
 
     raise RuntimeError(
-        f"Bot ativo não encontrado para o cliente "
-        f"{client_id}."
+        f"Bot ativo não encontrado para o cliente {client_id}."
     )
 
 
