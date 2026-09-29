@@ -770,6 +770,8 @@ async def receber_token_bot(
 ):
 
     token_inserido = update.message.text.strip()
+    print(f"🔎 TOKEN DIGITADO: {token_inserido[:12]}...")
+    print(f"🔎 BOT PRINCIPAL: {BOT_TOKEN[:12]}...")
 
     try:
 
