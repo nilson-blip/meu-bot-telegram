@@ -266,35 +266,17 @@ async def capturar_novo_canal(update: Update, context):
             )
 
 
+# ============================================================
+# CADASTRO MANUAL DESATIVADO
+# ============================================================
+
 async def registrar_bot(client_id: int):
 
-    bot_info = await telegram_app.bot.get_me()
-
-    existente = (
-        supabase.table("telegram_bots")
-        .select("id")
-        .eq("bot_id", bot_info.id)
-        .limit(1)
-        .execute()
+    raise RuntimeError(
+        "Cadastro manual de bot desativado. "
+        "Use o fluxo /configurar para o cliente "
+        "informar o token do próprio bot."
     )
-
-    if existente.data:
-        return existente.data[0]["id"]
-
-    resultado = (
-        supabase.table("telegram_bots")
-        .insert({
-            "client_id": client_id,
-            "bot_id": bot_info.id,
-            "username": bot_info.username,
-            "bot_name": bot_info.first_name,
-            "bot_token": BOT_TOKEN,
-            "status": "active",
-        })
-        .execute()
-    )
-
-    return resultado.data[0]["id"]
 
 
 # ============================================================
@@ -810,6 +792,42 @@ async def receber_token_bot(
             )
 
             return AGUARDANDO_TOKEN_BOT
+
+        # Verifica se esse bot já está cadastrado
+        # para outro cliente.
+        bot_existente = (
+            supabase.table("telegram_bots")
+            .select("id, client_id")
+            .eq(
+                "bot_id",
+                bot_info.id
+            )
+            .limit(1)
+            .execute()
+        )
+
+        if bot_existente.data:
+
+            cliente_existente = (
+                bot_existente.data[0]["client_id"]
+            )
+
+            cliente_atual = (
+                obter_ou_criar_cliente(
+                    update.effective_user.id
+                )
+            )
+
+            if cliente_existente != cliente_atual:
+
+                await update.message.reply_text(
+                    "❌ Esse bot já está vinculado "
+                    "a outro cliente.\n\n"
+                    "Envie o token de outro bot "
+                    "criado no @BotFather."
+                )
+
+                return AGUARDANDO_TOKEN_BOT
 
         context.user_data["bot_id"] = bot_info.id
 
@@ -1541,6 +1559,10 @@ async def exibir_revisao_final(
     return AGUARDANDO_REVISAO
 
 
+# ============================================================
+# CONCLUIR CONFIGURAÇÃO
+# ============================================================
+
 async def concluir_configuracao(
     update: Update,
     context
@@ -1623,28 +1645,92 @@ async def concluir_configuracao(
                 .execute()
             )
 
-        custom_bot_token = dados.get(
-            "bot_token"
-        )
+        # ====================================================
+        # REGISTRO AUTOMÁTICO DO BOT DO CLIENTE
+        # ====================================================
 
-        (
+        custom_bot_token = dados.get("bot_token")
+        custom_bot_id = dados.get("bot_id")
+        custom_bot_username = dados.get("bot_username")
+        custom_bot_name = dados.get("bot_name")
+
+        if not custom_bot_token or not custom_bot_id:
+
+            raise RuntimeError(
+                "Dados do bot do cliente não encontrados."
+            )
+
+        if custom_bot_token == BOT_TOKEN:
+
+            raise RuntimeError(
+                "O bot do cliente não pode usar o "
+                "mesmo token do Botchê principal."
+            )
+
+        # Verifica se esse bot já pertence
+        # a algum cliente.
+        bot_existente = (
             supabase.table("telegram_bots")
-            .upsert({
-                "client_id": client_id,
-                "bot_id": dados.get(
-                    "bot_id"
-                ),
-                "username": dados.get(
-                    "bot_username"
-                ),
-                "bot_name": dados.get(
-                    "bot_name"
-                ),
-                "bot_token": custom_bot_token,
-                "status": "active"
-            })
+            .select(
+                "id, client_id, bot_token"
+            )
+            .eq(
+                "bot_id",
+                custom_bot_id
+            )
+            .limit(1)
             .execute()
         )
+
+        if bot_existente.data:
+
+            bot_atual = bot_existente.data[0]
+
+            # O bot já pertence a outro cliente.
+            if bot_atual["client_id"] != client_id:
+
+                raise RuntimeError(
+                    "Esse bot do Telegram já está "
+                    "vinculado a outro cliente."
+                )
+
+            # É o mesmo cliente.
+            # Apenas atualiza os dados.
+            (
+                supabase.table("telegram_bots")
+                .update({
+                    "username": custom_bot_username,
+                    "bot_name": custom_bot_name,
+                    "bot_token": custom_bot_token,
+                    "status": "active"
+                })
+                .eq(
+                    "id",
+                    bot_atual["id"]
+                )
+                .execute()
+            )
+
+        else:
+
+            # Bot novo:
+            # registra automaticamente.
+            (
+                supabase.table("telegram_bots")
+                .insert({
+                    "client_id": client_id,
+                    "bot_id": custom_bot_id,
+                    "username": custom_bot_username,
+                    "bot_name": custom_bot_name,
+                    "bot_token": custom_bot_token,
+                    "status": "active"
+                })
+                .execute()
+            )
+
+        # ====================================================
+        # WEBHOOK DO BOT DO CLIENTE
+        # ====================================================
 
         if custom_bot_token:
 
@@ -1660,6 +1746,10 @@ async def concluir_configuracao(
                 await custom_bot.set_webhook(
                     url=webhook_url
                 )
+
+        # ====================================================
+        # MERCADO PAGO
+        # ====================================================
 
         params = {
             "client_id": MP_CLIENT_ID,
@@ -2240,7 +2330,6 @@ async def criar_pix(
 
     if not qr_code:
 
-        # Algumas respostas podem vir em outra estrutura.
         payment_method_data = payment_data.get(
             "payment_method",
             {}
@@ -2409,7 +2498,6 @@ async def receber_email_pix(
 
     email = update.message.text.strip()
 
-    # Validação simples
     if (
         "@" not in email
         or "." not in email.split("@")[-1]
@@ -2465,8 +2553,6 @@ async def receber_email_pix(
             "⏳ Gerando seu Pix..."
         )
 
-        # Monta um objeto de query mínimo para
-        # reaproveitar criar_pix().
         class QueryFake:
 
             from_user = update.effective_user
@@ -2515,7 +2601,6 @@ async def receber_email_pix(
                 )
             ])
 
-        # Botão para cartão
         botoes_pix.append([
             InlineKeyboardButton(
                 "💳 Pagar com Cartão",
@@ -2574,10 +2659,6 @@ async def botoes(
 
         return
 
-    # --------------------------------------------------------
-    # PIX
-    # --------------------------------------------------------
-
     if query.data.startswith("pix_"):
 
         await pedir_email_pix(
@@ -2586,10 +2667,6 @@ async def botoes(
         )
 
         return
-
-    # --------------------------------------------------------
-    # CARTÃO
-    # --------------------------------------------------------
 
     if query.data.startswith("cartao_"):
 
@@ -2703,10 +2780,6 @@ async def botoes(
                 )
 
             return
-
-    # --------------------------------------------------------
-    # COMPRA NORMAL
-    # --------------------------------------------------------
 
     if not query.data.startswith(
         "comprar_"
@@ -2969,10 +3042,6 @@ async def lifespan(app: FastAPI):
         )
     )
 
-    # --------------------------------------------------------
-    # RECEBE O E-MAIL DO PIX
-    # --------------------------------------------------------
-
     telegram_app.add_handler(
         MessageHandler(
             filters.TEXT &
@@ -3054,11 +3123,16 @@ async def registrar_bot_endpoint(
             f"Bot registrado. ID: {bot_id}"
         )
 
-    except Exception:
+    except Exception as erro:
+
+        print(
+            f"❌ Cadastro manual bloqueado: {erro}"
+        )
 
         return PlainTextResponse(
-            "Erro ao registrar bot.",
-            status_code=500
+            "Cadastro manual de bot desativado. "
+            "Use /configurar.",
+            status_code=403
         )
 
 
