@@ -720,7 +720,7 @@ async def passo1_nome_bot(
     ])
 
     await query.message.reply_text(
-        "🏷️️ <b>Passo 1 de 6: "
+        "🏷 <b>Passo 1 de 6: "
         "Nome do seu Bot</b>\n\n"
         "Como você gostaria de chamar "
         "o seu bot de vendas?\n"
@@ -793,8 +793,6 @@ async def receber_token_bot(
 
             return AGUARDANDO_TOKEN_BOT
 
-        # Verifica se esse bot já está cadastrado
-        # para outro cliente.
         bot_existente = (
             supabase.table("telegram_bots")
             .select("id, client_id")
@@ -976,7 +974,7 @@ async def exibir_menu_planos(
                 callback_data="add_mensal"
             ),
             InlineKeyboardButton(
-                "♾️️ Vitalício",
+                "♾ Vitalício",
                 callback_data="add_vitalicio"
             ),
         ],
@@ -1645,10 +1643,6 @@ async def concluir_configuracao(
                 .execute()
             )
 
-        # ====================================================
-        # REGISTRO AUTOMÁTICO DO BOT DO CLIENTE
-        # ====================================================
-
         custom_bot_token = dados.get("bot_token")
         custom_bot_id = dados.get("bot_id")
         custom_bot_username = dados.get("bot_username")
@@ -1667,8 +1661,6 @@ async def concluir_configuracao(
                 "mesmo token do Botchê principal."
             )
 
-        # Verifica se esse bot já pertence
-        # a algum cliente.
         bot_existente = (
             supabase.table("telegram_bots")
             .select(
@@ -1686,7 +1678,6 @@ async def concluir_configuracao(
 
             bot_atual = bot_existente.data[0]
 
-            # O bot já pertence a outro cliente.
             if bot_atual["client_id"] != client_id:
 
                 raise RuntimeError(
@@ -1694,8 +1685,6 @@ async def concluir_configuracao(
                     "vinculado a outro cliente."
                 )
 
-            # É o mesmo cliente.
-            # Apenas atualiza os dados.
             (
                 supabase.table("telegram_bots")
                 .update({
@@ -1713,8 +1702,6 @@ async def concluir_configuracao(
 
         else:
 
-            # Bot novo:
-            # registra automaticamente.
             (
                 supabase.table("telegram_bots")
                 .insert({
@@ -1727,10 +1714,6 @@ async def concluir_configuracao(
                 })
                 .execute()
             )
-
-        # ====================================================
-        # WEBHOOK DO BOT DO CLIENTE
-        # ====================================================
 
         if custom_bot_token:
 
@@ -1746,10 +1729,6 @@ async def concluir_configuracao(
                 await custom_bot.set_webhook(
                     url=webhook_url
                 )
-
-        # ====================================================
-        # MERCADO PAGO
-        # ====================================================
 
         params = {
             "client_id": MP_CLIENT_ID,
@@ -2131,50 +2110,33 @@ async def criar_checkout_cartao(
             "mas não retornou init_point."
         )
 
-    pagamento = (
-        supabase.table("payments")
-        .insert({
-            "order_id":
-                preference_id,
-            "telegram_user_id":
-                query.from_user.id,
-            "amount":
-                preco,
-            "status":
-                "pending",
-            "external_reference":
-                external_reference,
-            "dias_acesso":
-                dias_acesso,
-            "payment_url":
-                payment_url,
-            "remarketing_enviado":
-                False,
-            "client_id":
-                client_id,
-            "product_id":
-                product_id,
-            "vip_group_id":
-                vip_group_id,
-            "payment_connection_id":
-                payment_connection_id,
-        })
-        .execute()
-    )
+    supabase.table("payments").insert({
+        "order_id": preference_id,
+        "telegram_user_id": query.from_user.id,
+        "amount": preco,
+        "status": "pending",
+        "external_reference": external_reference,
+        "dias_acesso": dias_acesso,
+        "payment_url": payment_url,
+        "remarketing_enviado": False,
+        "client_id": client_id,
+        "product_id": product_id,
+        "vip_group_id": vip_group_id,
+        "payment_connection_id": payment_connection_id,
+    }).execute()
 
     return payment_url
 
 
 # ============================================================
-# CRIAR PIX DIRETO - SPLIT
+# CRIAR PIX DIRETO - SPLIT (SEM EXIGIR E-MAIL)
 # ============================================================
 
 async def criar_pix(
     product_id,
     produto,
     client_id,
-    query,
-    payer_email
+    query
 ):
 
     conexao = (
@@ -2250,6 +2212,9 @@ async def criar_pix(
         f"{query.from_user.id}_"
         f"{uuid.uuid4().hex}"
     )
+
+    # Gerando um e-mail padrão automático para evitar burocracia do usuário
+    payer_email = f"cliente_{query.from_user.id}@telegram.bot"
 
     payload = {
         "transaction_amount": preco,
@@ -2402,244 +2367,7 @@ async def criar_pix(
 
 
 # ============================================================
-# PEDIR E-MAIL PARA PIX
-# ============================================================
-
-async def pedir_email_pix(
-    update: Update,
-    context
-):
-
-    query = update.callback_query
-
-    await query.answer()
-
-    if not query.data.startswith("pix_"):
-        return
-
-    product_id = query.data.replace(
-        "pix_",
-        "",
-        1
-    )
-
-    try:
-
-        produto_res = (
-            supabase.table("products")
-            .select("*")
-            .eq(
-                "id",
-                product_id
-            )
-            .eq(
-                "status",
-                "active"
-            )
-            .single()
-            .execute()
-        )
-
-        if not produto_res.data:
-
-            raise RuntimeError(
-                "Plano não encontrado."
-            )
-
-        produto = produto_res.data
-
-        context.user_data[
-            "pix_compra"
-        ] = {
-            "product_id":
-                product_id,
-            "client_id":
-                produto["client_id"],
-        }
-
-        await query.message.reply_text(
-            "📧 <b>Antes de gerar seu Pix</b>\n\n"
-            "Informe seu <b>e-mail</b> abaixo. "
-            "O Mercado Pago exige esse dado para "
-            "criar o pagamento.\n\n"
-            "Exemplo:\n"
-            "<code>seuemail@gmail.com</code>",
-            parse_mode="HTML"
-        )
-
-    except Exception as erro:
-
-        print(
-            f"❌ ERRO AO PREPARAR PIX: {erro}"
-        )
-
-        await query.message.reply_text(
-            "❌ Não foi possível preparar o Pix. "
-            "Tente novamente."
-        )
-
-
-# ============================================================
-# RECEBER E-MAIL E GERAR PIX
-# ============================================================
-
-async def receber_email_pix(
-    update: Update,
-    context
-):
-
-    compra = context.user_data.get(
-        "pix_compra"
-    )
-
-    if not compra:
-
-        return
-
-    email = update.message.text.strip()
-
-    if (
-        "@" not in email
-        or "." not in email.split("@")[-1]
-    ):
-
-        await update.message.reply_text(
-            "❌ Esse e-mail parece inválido.\n\n"
-            "Envie novamente, por exemplo:\n"
-            "<code>seuemail@gmail.com</code>",
-            parse_mode="HTML"
-        )
-
-        return
-
-    product_id = compra[
-        "product_id"
-    ]
-
-    client_id = compra[
-        "client_id"
-    ]
-
-    try:
-
-        produto_res = (
-            supabase.table("products")
-            .select("*")
-            .eq(
-                "id",
-                product_id
-            )
-            .eq(
-                "client_id",
-                client_id
-            )
-            .eq(
-                "status",
-                "active"
-            )
-            .single()
-            .execute()
-        )
-
-        if not produto_res.data:
-
-            raise RuntimeError(
-                "Plano não encontrado."
-            )
-
-        produto = produto_res.data
-
-        await update.message.reply_text(
-            "⏳ Gerando seu Pix..."
-        )
-
-        class QueryFake:
-
-            from_user = update.effective_user
-
-        resultado = await criar_pix(
-            product_id,
-            produto,
-            client_id,
-            QueryFake(),
-            email
-        )
-
-        qr_code = resultado[
-            "qr_code"
-        ]
-
-        ticket_url = resultado.get(
-            "ticket_url"
-        )
-
-        preco = float(
-            produto["price"]
-        )
-
-        texto_pix = (
-            "💠 <b>PIX GERADO!</b>\n\n"
-            f"📦 Plano: "
-            f"{html.escape(str(produto.get('duration_type', 'Plano')).capitalize())}\n"
-            f"💰 Valor: <b>R$ {preco:.2f}</b>\n\n"
-            "📋 <b>PIX COPIA E COLA:</b>\n\n"
-            f"<code>{html.escape(qr_code)}</code>\n\n"
-            "👆 Toque no código acima para copiar "
-            "e cole no aplicativo do seu banco.\n\n"
-            "Depois que o pagamento for aprovado, "
-            "seu acesso será liberado automaticamente."
-        )
-
-        botoes_pix = []
-
-        if ticket_url:
-
-            botoes_pix.append([
-                InlineKeyboardButton(
-                    "🔗 Abrir Pix",
-                    url=ticket_url
-                )
-            ])
-
-        botoes_pix.append([
-            InlineKeyboardButton(
-                "💳 Pagar com Cartão",
-                callback_data=f"cartao_{product_id}"
-            )
-        ])
-
-        await update.message.reply_text(
-            texto_pix,
-            reply_markup=InlineKeyboardMarkup(
-                botoes_pix
-            ),
-            parse_mode="HTML"
-        )
-
-        context.user_data.pop(
-            "pix_compra",
-            None
-        )
-
-    except Exception as erro:
-
-        print(
-            f"❌ ERRO AO GERAR PIX: {erro}"
-        )
-
-        context.user_data.pop(
-            "pix_compra",
-            None
-        )
-
-        await update.message.reply_text(
-            "❌ Não consegui gerar o Pix.\n\n"
-            "Tente novamente em alguns instantes."
-        )
-
-
-# ============================================================
-# COMPRA - PIX / CARTÃO
+# COMPRA - PIX / CARTÃO (COM TOKEN DO CLIENTE ISOLADO)
 # ============================================================
 
 async def botoes(
@@ -2659,12 +2387,98 @@ async def botoes(
 
         return
 
+    # Processamento direto do PIX sem pedir e-mail
     if query.data.startswith("pix_"):
 
-        await pedir_email_pix(
-            update,
-            context
-        )
+        product_id = query.data.replace("pix_", "", 1)
+        client_id = None
+
+        try:
+            produto_res = (
+                supabase.table("products")
+                .select("*")
+                .eq("id", product_id)
+                .eq("status", "active")
+                .single()
+                .execute()
+            )
+
+            if not produto_res.data:
+                raise RuntimeError("Plano não encontrado.")
+
+            produto = produto_res.data
+            client_id = produto["client_id"]
+            custom_token = await obter_token_bot_cliente(client_id)
+
+            async with Bot(token=custom_token) as client_bot:
+                await client_bot.send_message(
+                    chat_id=query.from_user.id,
+                    text="⏳ Gerando seu Pix..."
+                )
+
+            class QueryFake:
+                from_user = query.from_user
+
+            resultado = await criar_pix(
+                product_id,
+                produto,
+                client_id,
+                QueryFake()
+            )
+
+            qr_code = resultado["qr_code"]
+            ticket_url = resultado.get("ticket_url")
+            preco = float(produto["price"])
+
+            texto_pix = (
+                "💠 <b>PIX GERADO!</b>\n\n"
+                f"📦 Plano: "
+                f"{html.escape(str(produto.get('duration_type', 'Plano')).capitalize())}\n"
+                f"💰 Valor: <b>R$ {preco:.2f}</b>\n\n"
+                "📋 <b>PIX COPIA E COLA:</b>\n\n"
+                f"<code>{html.escape(qr_code)}</code>\n\n"
+                "👆 Toque no código acima para copiar "
+                "e cole no aplicativo do seu banco.\n\n"
+                "Depois que o pagamento for aprovado, "
+                "seu acesso será liberado automaticamente."
+            )
+
+            botoes_pix = []
+            if ticket_url:
+                botoes_pix.append([
+                    InlineKeyboardButton("🔗 Abrir Pix", url=ticket_url)
+                ])
+
+            botoes_pix.append([
+                InlineKeyboardButton(
+                    "💳 Pagar com Cartão",
+                    callback_data=f"cartao_{product_id}"
+                )
+            ])
+
+            async with Bot(token=custom_token) as client_bot:
+                await client_bot.send_message(
+                    chat_id=query.from_user.id,
+                    text=texto_pix,
+                    reply_markup=InlineKeyboardMarkup(botoes_pix),
+                    parse_mode="HTML"
+                )
+
+        except Exception as erro:
+            print(f"❌ ERRO AO GERAR PIX: {erro}")
+            try:
+                if client_id:
+                    custom_token = await obter_token_bot_cliente(client_id)
+                else:
+                    custom_token = obter_bot_do_update(update).token
+
+                async with Bot(token=custom_token) as client_bot:
+                    await client_bot.send_message(
+                        chat_id=query.from_user.id,
+                        text="❌ Não consegui gerar o Pix. Tente novamente em alguns instantes."
+                    )
+            except Exception as erro_fallback:
+                print(f"❌ ERRO FALLBACK PIX: {erro_fallback}")
 
         return
 
@@ -2675,6 +2489,7 @@ async def botoes(
             "",
             1
         )
+        client_id = None
 
         try:
 
@@ -2700,24 +2515,14 @@ async def botoes(
                 )
 
             produto = produto_res.data
+            client_id = produto["client_id"]
+            custom_token = await obter_token_bot_cliente(client_id)
 
-            client_id = produto[
-                "client_id"
-            ]
-
-            custom_token = (
-                await obter_token_bot_cliente(
-                    client_id
-                )
-            )
-
-            payment_url = (
-                await criar_checkout_cartao(
-                    product_id,
-                    produto,
-                    client_id,
-                    query
-                )
+            payment_url = await criar_checkout_cartao(
+                product_id,
+                produto,
+                client_id,
+                query
             )
 
             async with Bot(
@@ -2747,43 +2552,25 @@ async def botoes(
 
         except Exception as erro:
 
-            print(
-                f"❌ ERRO CARTÃO: {erro}"
-            )
+            print(f"❌ ERRO CARTÃO: {erro}")
 
             try:
+                if client_id:
+                    custom_token = await obter_token_bot_cliente(client_id)
+                else:
+                    custom_token = obter_bot_do_update(update).token
 
-                custom_token = (
-                    await obter_token_bot_cliente(
-                        client_id
-                    )
-                )
-
-                async with Bot(
-                    token=custom_token
-                ) as client_bot:
-
+                async with Bot(token=custom_token) as client_bot:
                     await client_bot.send_message(
                         chat_id=query.from_user.id,
-                        text=(
-                            "❌ Não foi possível "
-                            "gerar o pagamento com cartão. "
-                            "Tente novamente."
-                        )
+                        text="❌ Não foi possível gerar o pagamento com cartão. Tente novamente."
                     )
-
             except Exception as erro_fallback:
-
-                print(
-                    "❌ ERRO FALLBACK CARTÃO: "
-                    f"{erro_fallback}"
-                )
+                print(f"❌ ERRO FALLBACK CARTÃO: {erro_fallback}")
 
             return
 
-    if not query.data.startswith(
-        "comprar_"
-    ):
+    if not query.data.startswith("comprar_"):
         return
 
     client_id = None
@@ -2818,16 +2605,8 @@ async def botoes(
             )
 
         produto = produto_res.data
-
-        client_id = produto[
-            "client_id"
-        ]
-
-        custom_token = (
-            await obter_token_bot_cliente(
-                client_id
-            )
-        )
+        client_id = produto["client_id"]
+        custom_token = await obter_token_bot_cliente(client_id)
 
         keyboard = InlineKeyboardMarkup([
             [
@@ -2844,13 +2623,9 @@ async def botoes(
             ]
         ])
 
-        preco = float(
-            produto["price"]
-        )
+        preco = float(produto["price"])
 
-        async with Bot(
-            token=custom_token
-        ) as client_bot:
+        async with Bot(token=custom_token) as client_bot:
 
             await client_bot.send_message(
                 chat_id=query.from_user.id,
@@ -2867,45 +2642,21 @@ async def botoes(
 
     except Exception as erro:
 
-        print(
-            f"❌ ERRO AO PREPARAR PAGAMENTO: {erro}"
-        )
+        print(f"❌ ERRO AO PREPARAR PAGAMENTO: {erro}")
 
         try:
-
             if client_id:
-
-                custom_token = (
-                    await obter_token_bot_cliente(
-                        client_id
-                    )
-                )
-
+                custom_token = await obter_token_bot_cliente(client_id)
             else:
+                custom_token = obter_bot_do_update(update).token
 
-                custom_token = (
-                    obter_bot_do_update(update).token
-                )
-
-            async with Bot(
-                token=custom_token
-            ) as client_bot:
-
+            async with Bot(token=custom_token) as client_bot:
                 await client_bot.send_message(
                     chat_id=query.from_user.id,
-                    text=(
-                        "❌ Ocorreu um erro ao preparar "
-                        "o pagamento. Por favor, tente "
-                        "novamente."
-                    )
+                    text="❌ Ocorreu um erro ao preparar o pagamento. Por favor, tente novamente."
                 )
-
         except Exception as erro_fallback:
-
-            print(
-                "❌ ERRO AO ENVIAR MENSAGEM "
-                f"DE ERRO: {erro_fallback}"
-            )
+            print(f"❌ ERRO AO ENVIAR MENSAGEM DE ERRO: {erro_fallback}")
 
 
 # ============================================================
@@ -3039,14 +2790,6 @@ async def lifespan(app: FastAPI):
     telegram_app.add_handler(
         CallbackQueryHandler(
             botoes
-        )
-    )
-
-    telegram_app.add_handler(
-        MessageHandler(
-            filters.TEXT &
-            ~filters.COMMAND,
-            receber_email_pix
         )
     )
 
@@ -3530,7 +3273,7 @@ async def custom_telegram_webhook(
 
 
 # ============================================================
-# WEBHOOK MERCADO PAGO
+# WEBHOOK MERCADO PAGO (COM TRATAMENTO ROBUSTO)
 # ============================================================
 
 @app.post("/mercadopago")
