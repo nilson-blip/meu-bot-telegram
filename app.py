@@ -139,7 +139,7 @@ def obter_ou_criar_cliente(telegram_user_id: int):
 
 def obter_bot_do_update(update: Update):
     """
-    Retorna o bot que realmente recebeu o Update.
+    Retorna le bot que realmente recebeu o Update.
 
     IMPORTANTE:
     Não usa telegram_app.bot, pois ele é o BOT_TOKEN
@@ -732,7 +732,7 @@ async def passo1_nome_bot(
     ])
 
     await query.message.reply_text(
-        "🏷️ <b>Passo 1 de 6: "
+        "🏷️️ <b>Passo 1 de 6: "
         "Nome do seu Bot</b>\n\n"
         "Como você gostaria de chamar "
         "o seu bot de vendas?\n"
@@ -942,7 +942,7 @@ async def exibir_menu_planos(
                 callback_data="add_mensal"
             ),
             InlineKeyboardButton(
-                "♾️ Vitalício",
+                "♾️️ Vitalício",
                 callback_data="add_vitalicio"
             ),
         ],
