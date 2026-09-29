@@ -1679,7 +1679,7 @@ async def concluir_configuracao(
             "com Sucesso!</b>\n\n"
             "💳 <b>Conectar Mercado Pago "
             "(Última Etapa)</b>\n\n"
-            "Clique no botão abaixo para "
+            "Clique o botão abaixo para "
             "conectar seu Mercado Pago "
             "com segurança.",
             reply_markup=keyboard,
@@ -1718,19 +1718,7 @@ async def start(
         reply_markup=ReplyKeyboardRemove()
     )
 
-    # ========================================================
-    # CORREÇÃO:
-    # NÃO usar context.bot.token aqui.
-    #
-    # context.bot pertence ao Application principal,
-    # portanto seria o BOT_TOKEN do Botchê.
-    #
-    # O Update carrega o bot que realmente recebeu
-    # a mensagem.
-    # ========================================================
-
     bot_atual = obter_bot_do_update(update)
-
     token_atual = bot_atual.token
 
     bot_data = (
@@ -1932,7 +1920,7 @@ async def botoes(
         ]
 
         # ----------------------------------------------------
-        # BOT DO CLIENTE
+        # GARANTE QUE O TOKEN DO CLIENTE É BUSCADO COM SEGURANÇA
         # ----------------------------------------------------
 
         custom_token = (
@@ -1942,7 +1930,7 @@ async def botoes(
         )
 
         # ----------------------------------------------------
-        # CONEXÃO MERCADO PAGO DO CLIENTE
+        # CONEXÃO MERCADO PAGO DO CLIENTE CORRESPONDENTE
         # ----------------------------------------------------
 
         conexao = (
@@ -1981,10 +1969,6 @@ async def botoes(
             )
         )
 
-        # ====================================================
-        # SEM FALLBACK PARA O MP_TOKEN MESTRE
-        # ====================================================
-
         if not client_access_token:
 
             raise RuntimeError(
@@ -1997,10 +1981,6 @@ async def botoes(
                 "fee_percentage"
             ) or 5.0
         )
-
-        # ----------------------------------------------------
-        # DADOS DO PRODUTO
-        # ----------------------------------------------------
 
         preco = float(
             produto["price"]
@@ -2020,19 +2000,11 @@ async def botoes(
             2
         )
 
-        # ====================================================
-        # REFERÊNCIA ÚNICA
-        # ====================================================
-
         external_reference = (
             f"vip_{client_id}_"
             f"{query.from_user.id}_"
             f"{uuid.uuid4().hex}"
         )
-
-        # ----------------------------------------------------
-        # CHECKOUT PRO
-        # ----------------------------------------------------
 
         preference_data = {
             "items": [
@@ -2070,18 +2042,6 @@ async def botoes(
             "auto_return": "approved",
         }
 
-        print(
-            "🟢 CRIANDO CHECKOUT PRO | "
-            f"cliente={client_id} | "
-            f"produto={product_id} | "
-            f"valor={preco:.2f} | "
-            f"comissao={marketplace_fee:.2f}"
-        )
-
-        # ----------------------------------------------------
-        # CRIA PREFERÊNCIA
-        # ----------------------------------------------------
-
         async with httpx.AsyncClient(
             follow_redirects=True
         ) as client:
@@ -2100,12 +2060,6 @@ async def botoes(
             )
 
         if response.status_code != 201:
-
-            print(
-                "⚠️ ERRO CHECKOUT PRO "
-                f"HTTP {response.status_code}: "
-                f"{response.text}"
-            )
 
             raise RuntimeError(
                 "Mercado Pago recusou a preferência: "
@@ -2131,16 +2085,6 @@ async def botoes(
                 "Mercado Pago criou a preferência, "
                 "mas não retornou init_point."
             )
-
-        print(
-            "✅ CHECKOUT PRO CRIADO | "
-            f"preference_id={preference_id} | "
-            f"cliente={client_id}"
-        )
-
-        # ----------------------------------------------------
-        # SALVA PAGAMENTO PENDENTE
-        # ----------------------------------------------------
 
         pagamento_existente = (
             supabase.table("payments")
@@ -2199,7 +2143,8 @@ async def botoes(
             )
 
         # ----------------------------------------------------
-        # ENVIA LINK PELO BOT DO CLIENTE
+        # GARANTE QUE A MENSAGEM É ENVIADA PELO BOT DO CLIENTE
+        # PARA O CHAT DO CLIENTE FINAL (query.from_user.id)
         # ----------------------------------------------------
 
         async with Bot(
@@ -2823,11 +2768,6 @@ async def custom_telegram_webhook(
 
     try:
 
-        # ----------------------------------------------------
-        # CONFIRMA QUE O TOKEN REALMENTE PERTENCE
-        # A UM BOT CLIENTE ATIVO
-        # ----------------------------------------------------
-
         bot_res = (
             supabase.table("telegram_bots")
             .select("client_id, bot_id, username")
@@ -2856,10 +2796,6 @@ async def custom_telegram_webhook(
             )
 
         data = await request.json()
-
-        # ----------------------------------------------------
-        # O UPDATE É CRIADO COM O BOT DO CLIENTE
-        # ----------------------------------------------------
 
         async with Bot(
             token=custom_bot_token
@@ -2966,10 +2902,6 @@ async def mercadopago_webhook(
             or payment_id_hook
         )
 
-        # ----------------------------------------------------
-        # VALIDA ASSINATURA
-        # ----------------------------------------------------
-
         ts = None
         v1 = None
 
@@ -3030,10 +2962,6 @@ async def mercadopago_webhook(
                 "OK"
             )
 
-        # ----------------------------------------------------
-        # PRIMEIRO TENTA ENCONTRAR PELO ID
-        # ----------------------------------------------------
-
         pagamento = (
             supabase.table("payments")
             .select(
@@ -3049,11 +2977,6 @@ async def mercadopago_webhook(
             .limit(1)
             .execute()
         )
-
-        # ----------------------------------------------------
-        # SE NÃO ENCONTRAR, CONSULTA AS CONEXÕES
-        # PARA DESCOBRIR O PAGAMENTO
-        # ----------------------------------------------------
 
         if not pagamento.data:
 
@@ -3163,13 +3086,6 @@ async def mercadopago_webhook(
 
                             pagamento = busca_ref
 
-                            print(
-                                "🔎 Pagamento "
-                                "encontrado por "
-                                "external_reference | "
-                                f"cliente={pagamento.data[0]['client_id']}"
-                            )
-
                             (
                                 supabase.table(
                                     "payments"
@@ -3202,10 +3118,6 @@ async def mercadopago_webhook(
             pagamento.data[0]
         )
 
-        # ----------------------------------------------------
-        # TOKEN DA CONEXÃO DO CLIENTE
-        # ----------------------------------------------------
-
         payment_connection_id = (
             pagamento_atual.get(
                 "payment_connection_id"
@@ -3213,11 +3125,6 @@ async def mercadopago_webhook(
         )
 
         if not payment_connection_id:
-
-            print(
-                "❌ Pagamento sem "
-                "payment_connection_id."
-            )
 
             return PlainTextResponse(
                 "OK"
@@ -3242,11 +3149,6 @@ async def mercadopago_webhook(
 
         if not conexao.data:
 
-            print(
-                "❌ Conexão Mercado Pago "
-                "do pagamento não encontrada."
-            )
-
             return PlainTextResponse(
                 "OK"
             )
@@ -3257,16 +3159,7 @@ async def mercadopago_webhook(
             )
         )
 
-        # ====================================================
-        # SEM FALLBACK PARA O TOKEN MESTRE
-        # ====================================================
-
         if not order_access_token:
-
-            print(
-                "❌ Conexão do cliente não possui "
-                "access_token."
-            )
 
             return PlainTextResponse(
                 "OK"
@@ -3290,13 +3183,6 @@ async def mercadopago_webhook(
 
         if response.status_code != 200:
 
-            print(
-                "⚠️ Não foi possível consultar "
-                "pagamento no Mercado Pago: "
-                f"{response.status_code} "
-                f"{response.text}"
-            )
-
             return PlainTextResponse(
                 "OK"
             )
@@ -3313,17 +3199,6 @@ async def mercadopago_webhook(
             )
         )
 
-        print(
-            "🔔 WEBHOOK MP | "
-            f"payment={data_id} | "
-            f"status={status} | "
-            f"cliente={pagamento_atual.get('client_id')}"
-        )
-
-        # ----------------------------------------------------
-        # GARANTE QUE A REFERÊNCIA É DO BOTCHÊ
-        # ----------------------------------------------------
-
         if (
             not external_reference
             or not external_reference.startswith(
@@ -3335,10 +3210,6 @@ async def mercadopago_webhook(
                 "OK"
             )
 
-        # ----------------------------------------------------
-        # APROVADO
-        # ----------------------------------------------------
-
         if status == "approved":
 
             if pagamento_atual.get(
@@ -3349,11 +3220,6 @@ async def mercadopago_webhook(
                     "OK"
                 )
 
-            # =================================================
-            # USA O USUÁRIO SALVO NO PAGAMENTO
-            # E NÃO UMA REFERÊNCIA ANTIGA
-            # =================================================
-
             telegram_user_id = (
                 pagamento_atual.get(
                     "telegram_user_id"
@@ -3361,11 +3227,6 @@ async def mercadopago_webhook(
             )
 
             if not telegram_user_id:
-
-                print(
-                    "❌ Pagamento aprovado sem "
-                    "telegram_user_id."
-                )
 
                 return PlainTextResponse(
                     "OK"
@@ -3536,7 +3397,7 @@ async def mercadopago_webhook(
     except Exception as e:
 
         print(
-            f"❌ ERRO WEBHOOK MERCADO PAGO: {e}"
+            f"❌ ERRO WEBHOOK MERCADO Pago: {e}"
         )
 
         return PlainTextResponse(
