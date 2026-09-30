@@ -2412,23 +2412,6 @@ async def botoes(
                 produto["price"]
             )
 
-            async with Bot(
-                token=custom_token
-            ) as client_bot:
-
-                await client_bot.send_message(
-                    chat_id=query.from_user.id,
-
-                    text=(
-    "💳 <b>Pagamento</b>\n\n"
-    f"📦 Plano: "
-    f"{html.escape(str(produto.get('duration_type', 'Plano')).capitalize())}\n"
-    f"💰 Valor: <b>R$ {preco:.2f}</b>\n\n"
-    "👇 Clique no link abaixo para efetuar seu pagamento:\n\n"
-    f"{payment_url}"
-),
-parse_mode="HTML"
-
                 )
 
         except Exception as erro:
