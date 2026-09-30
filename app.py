@@ -2336,14 +2336,13 @@ async def botoes(
     # CHECKOUT MERCADO PAGO
     # ========================================================
 
- if query.data.startswith("plano_"):
+    if query.data.startswith("plano_"):
 
         product_id = query.data.replace(
-    "plano_",
-    "",
-    1
+            "plano_",
+            "",
+            1
         )
-
 
         client_id = None
 
@@ -2440,7 +2439,7 @@ async def botoes(
                     f"{erro_fallback}"
                 )
 
-        return
+            return
 
     # ========================================================
     # ESCOLHA DO PLANO
