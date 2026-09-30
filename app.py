@@ -2412,8 +2412,6 @@ async def botoes(
                 produto["price"]
             )
 
-                )
-
         except Exception as erro:
 
             print(
