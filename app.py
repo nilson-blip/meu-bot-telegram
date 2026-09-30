@@ -2337,7 +2337,7 @@ async def botoes(
     # CHECKOUT MERCADO PAGO
     # ========================================================
 
-        if query.data.startswith("plano_"):
+ if query.data.startswith("plano_"):
 
         product_id = query.data.replace(
     "plano_",
