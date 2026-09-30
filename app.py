@@ -2334,16 +2334,29 @@ async def botoes(
         return
 
     # ========================================================
-    # PIX
+    # CHECKOUT MERCADO PAGO
     # ========================================================
 
-    if query.data.startswith("pix_"):
+    if (
+        query.data.startswith("pix_")
+        or query.data.startswith("cartao_")
+    ):
 
-        product_id = query.data.replace(
-            "pix_",
-            "",
-            1
-        )
+        if query.data.startswith("pix_"):
+
+            product_id = query.data.replace(
+                "pix_",
+                "",
+                1
+            )
+
+        else:
+
+            product_id = query.data.replace(
+                "cartao_",
+                "",
+                1
+            )
 
         client_id = None
 
@@ -2352,14 +2365,8 @@ async def botoes(
             produto_res = (
                 supabase.table("products")
                 .select("*")
-                .eq(
-                    "id",
-                    product_id
-                )
-                .eq(
-                    "status",
-                    "active"
-                )
+                .eq("id", product_id)
+                .eq("status", "active")
                 .single()
                 .execute()
             )
@@ -2374,7 +2381,6 @@ async def botoes(
 
             client_id = produto["client_id"]
 
-            # USA O MESMO BOT QUE RECEBEU O CALLBACK
             custom_token = (
                 await obter_token_bot_cliente(
                     client_id,
@@ -2383,218 +2389,62 @@ async def botoes(
             )
 
             print(
-                "✅ BOT DO CLIENTE IDENTIFICADO NO PIX | "
-                f"client_id={client_id} | "
-                f"token={custom_token[:12]}..."
+                "✅ BOT CLIENTE IDENTIFICADO | "
+                f"client_id={client_id}"
             )
 
-            async with Bot(
-                token=custom_token
-            ) as client_bot:
+            await query.message.reply_text(
+                "⏳ Gerando seu checkout..."
+            )
 
-                await client_bot.send_message(
-                    chat_id=query.from_user.id,
-                    text="⏳ Gerando seu Pix..."
+            resultado = (
+                await criar_checkout_marketplace(
+                    product_id,
+                    produto,
+                    client_id,
+                    query
                 )
-
-            class QueryFake:
-
-                from_user = query.from_user
-
-            resultado = await criar_pix(
-                product_id,
-                produto,
-                client_id,
-                QueryFake()
             )
 
-            qr_code = resultado["qr_code"]
-
-            ticket_url = resultado.get(
-                "ticket_url"
-            )
+            payment_url = resultado["payment_url"]
 
             preco = float(
                 produto["price"]
             )
 
-            texto_pix = (
-                "💠 <b>PIX GERADO!</b>\n\n"
-                f"📦 Plano: "
-                f"{html.escape(str(produto.get('duration_type', 'Plano')).capitalize())}\n"
-                f"💰 Valor: <b>R$ {preco:.2f}</b>\n\n"
-                "📋 <b>PIX COPIA E COLA:</b>\n\n"
-                f"<code>{html.escape(qr_code)}</code>\n\n"
-                "👆 Toque no código acima para copiar "
-                "e cole no aplicativo do seu banco.\n\n"
-                "Depois que o pagamento for aprovado, "
-                "seu acesso será liberado automaticamente."
-            )
-
-            botoes_pix = []
-
-            if ticket_url:
-
-                botoes_pix.append([
-                    InlineKeyboardButton(
-                        "🔗 Abrir Pix",
-                        url=ticket_url
-                    )
-                ])
-
-            botoes_pix.append([
-                InlineKeyboardButton(
-                    "💳 Pagar com Cartão",
-                    callback_data=f"cartao_{product_id}"
-                )
-            ])
-
             async with Bot(
                 token=custom_token
             ) as client_bot:
 
                 await client_bot.send_message(
                     chat_id=query.from_user.id,
-                    text=texto_pix,
-                    reply_markup=InlineKeyboardMarkup(
-                        botoes_pix
-                    ),
-                    parse_mode="HTML"
-                )
 
-        except Exception as erro:
-
-            print(
-                f"❌ ERRO AO GERAR PIX: {erro}"
-            )
-
-            try:
-
-                if client_id:
-
-                    custom_token = (
-                        await obter_token_bot_cliente(
-                            client_id,
-                            token_atual
-                        )
-                    )
-
-                else:
-
-                    custom_token = token_atual
-
-                async with Bot(
-                    token=custom_token
-                ) as client_bot:
-
-                    await client_bot.send_message(
-                        chat_id=query.from_user.id,
-                        text=(
-                            "❌ Não consegui gerar o Pix. "
-                            "Tente novamente em alguns instantes."
-                        )
-                    )
-
-            except Exception as erro_fallback:
-
-                print(
-                    f"❌ ERRO FALLBACK PIX: "
-                    f"{erro_fallback}"
-                )
-
-        return
-
-    # ========================================================
-    # CARTÃO
-    # ========================================================
-
-    if query.data.startswith("cartao_"):
-
-        product_id = query.data.replace(
-            "cartao_",
-            "",
-            1
-        )
-
-        client_id = None
-
-        try:
-
-            produto_res = (
-                supabase.table("products")
-                .select("*")
-                .eq(
-                    "id",
-                    product_id
-                )
-                .eq(
-                    "status",
-                    "active"
-                )
-                .single()
-                .execute()
-            )
-
-            if not produto_res.data:
-
-                raise RuntimeError(
-                    "Plano não encontrado."
-                )
-
-            produto = produto_res.data
-
-            client_id = produto["client_id"]
-
-            # USA O MESMO BOT QUE RECEBEU O CALLBACK
-            custom_token = (
-                await obter_token_bot_cliente(
-                    client_id,
-                    token_atual
-                )
-            )
-
-            print(
-                "✅ BOT DO CLIENTE IDENTIFICADO NO CARTÃO | "
-                f"client_id={client_id} | "
-                f"token={custom_token[:12]}..."
-            )
-
-            payment_url = await criar_checkout_cartao(
-                product_id,
-                produto,
-                client_id,
-                query
-            )
-
-            async with Bot(
-                token=custom_token
-            ) as client_bot:
-
-                await client_bot.send_message(
-                    chat_id=query.from_user.id,
                     text=(
-                        "💳 <b>Pagamento com cartão</b>\n\n"
-                        "Clique no botão abaixo para "
-                        "abrir o Mercado Pago e concluir "
-                        "seu pagamento:"
+                        "💳 <b>Pagamento</b>\n\n"
+                        f"📦 Plano: "
+                        f"{html.escape(str(produto.get('duration_type', 'Plano')).capitalize())}\n"
+                        f"💰 Valor: <b>R$ {preco:.2f}</b>\n\n"
+                        "Clique abaixo para abrir o "
+                        "Mercado Pago e escolher "
+                        "<b>Pix ou cartão</b>."
                     ),
+
                     reply_markup=InlineKeyboardMarkup([
                         [
                             InlineKeyboardButton(
-                                "💳 Pagar com Cartão",
+                                "💳 PAGAR AGORA",
                                 url=payment_url
                             )
                         ]
                     ]),
+
                     parse_mode="HTML"
                 )
-
-            return
 
         except Exception as erro:
 
             print(
-                f"❌ ERRO CARTÃO: {erro}"
+                f"❌ ERRO AO GERAR CHECKOUT: {erro}"
             )
 
             try:
@@ -2619,8 +2469,8 @@ async def botoes(
                     await client_bot.send_message(
                         chat_id=query.from_user.id,
                         text=(
-                            "❌ Não foi possível gerar "
-                            "o pagamento com cartão. "
+                            "❌ Não foi possível "
+                            "gerar o pagamento. "
                             "Tente novamente."
                         )
                     )
@@ -2628,11 +2478,11 @@ async def botoes(
             except Exception as erro_fallback:
 
                 print(
-                    f"❌ ERRO FALLBACK CARTÃO: "
+                    "❌ ERRO FALLBACK CHECKOUT: "
                     f"{erro_fallback}"
                 )
 
-            return
+        return
 
     # ========================================================
     # ESCOLHA DO PLANO
