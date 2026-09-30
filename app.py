@@ -2429,7 +2429,6 @@ async def botoes(
 ),
 parse_mode="HTML"
 
-                    parse_mode="HTML"
                 )
 
         except Exception as erro:
