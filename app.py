@@ -1903,9 +1903,9 @@ async def start(
 
         botoes_planos.append([
             InlineKeyboardButton(
-                f"⚡ Plano {tempo} - R$ {preco:.2f}",
-                callback_data=f"comprar_{prod['id']}"
-            )
+                f"⚡ Plano {tempo} - R$ {preco:.2f}",)
+                
+        callback_data=f"plano_{prod['id']}"
         ])
 
     keyboard = InlineKeyboardMarkup(
