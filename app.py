@@ -2131,7 +2131,7 @@ async def criar_checkout_cartao(
 # CRIAR PIX DIRETO - SPLIT (SEM EXIGIR E-MAIL)
 # ============================================================
 
-async def criar_pix(
+async def criar_checkout_marketplace(
     product_id,
     produto,
     client_id,
@@ -2139,70 +2139,40 @@ async def criar_pix(
 ):
 
     conexao = (
-        supabase.table(
-            "payment_connections"
-        )
-        .select(
-            "id, access_token, fee_percentage"
-        )
-        .eq(
-            "client_id",
-            client_id
-        )
-        .eq(
-            "status",
-            "active"
-        )
+        supabase.table("payment_connections")
+        .select("id, access_token, fee_percentage")
+        .eq("client_id", client_id)
+        .eq("status", "active")
         .limit(1)
         .execute()
     )
 
     if not conexao.data:
-
         raise RuntimeError(
-            "Nenhuma conexão de pagamento "
-            "ativa encontrada para este cliente."
+            "Nenhuma conexão Mercado Pago ativa encontrada."
         )
 
-    payment_connection_id = (
-        conexao.data[0]["id"]
-    )
+    payment_connection_id = conexao.data[0]["id"]
 
-    client_access_token = (
-        conexao.data[0].get(
-            "access_token"
-        )
-    )
+    client_access_token = conexao.data[0].get("access_token")
 
     if not client_access_token:
-
         raise RuntimeError(
-            "A conexão Mercado Pago deste cliente "
-            "não possui access_token."
+            "A conexão Mercado Pago não possui access_token."
         )
 
     fee_percentage = float(
-        conexao.data[0].get(
-            "fee_percentage"
-        ) or 5.0
+        conexao.data[0].get("fee_percentage") or 5.0
     )
 
-    preco = round(
-        float(produto["price"]),
-        2
-    )
+    preco = round(float(produto["price"]), 2)
 
-    dias_acesso = int(
-        produto["duration_days"]
-    )
+    dias_acesso = int(produto["duration_days"])
 
-    vip_group_id = produto.get(
-        "vip_group_id"
-    )
+    vip_group_id = produto.get("vip_group_id")
 
-    application_fee = round(
-        preco *
-        (fee_percentage / 100.0),
+    marketplace_fee = round(
+        preco * (fee_percentage / 100.0),
         2
     )
 
@@ -2212,25 +2182,44 @@ async def criar_pix(
         f"{uuid.uuid4().hex}"
     )
 
-    # Gerando um e-mail padrão automático para evitar burocracia do usuário
-    payer_email = f"cliente_{query.from_user.id}@telegram.bot"
-
     payload = {
-        "transaction_amount": preco,
-        "description": (
-            f"Acesso VIP - "
-            f"{produto.get('title', 'Produto')}"
-        ),
-        "payment_method_id": "pix",
-        "payer": {
-            "email": payer_email
-        },
+        "items": [
+            {
+                "id": str(product_id),
+                "title": str(
+                    produto.get(
+                        "title",
+                        "Acesso VIP"
+                    )
+                ),
+                "currency_id": "BRL",
+                "quantity": 1,
+                "unit_price": preco
+            }
+        ],
+
+        "marketplace_fee": marketplace_fee,
+
         "external_reference": external_reference,
-        "application_fee": application_fee,
+
         "notification_url": (
             "https://meu-bot-telegram-production-d9c3.up.railway.app"
             "/mercadopago"
         ),
+
+        "back_urls": {
+            "success": (
+                "https://meu-bot-telegram-production-d9c3.up.railway.app/"
+            ),
+            "failure": (
+                "https://meu-bot-telegram-production-d9c3.up.railway.app/"
+            ),
+            "pending": (
+                "https://meu-bot-telegram-production-d9c3.up.railway.app/"
+            )
+        },
+
+        "auto_return": "approved"
     }
 
     async with httpx.AsyncClient(
@@ -2238,113 +2227,56 @@ async def criar_pix(
     ) as client:
 
         response = await client.post(
-            "https://api.mercadopago.com/v1/payments",
+            "https://api.mercadopago.com/checkout/preferences",
+
             headers={
                 "Authorization":
                     f"Bearer {client_access_token}",
                 "Content-Type":
                     "application/json",
                 "X-Idempotency-Key":
-                    str(uuid.uuid4()),
+                    str(uuid.uuid4())
             },
+
             json=payload,
-            timeout=30.0,
+
+            timeout=30.0
         )
 
     if response.status_code not in [200, 201]:
 
         raise RuntimeError(
-            "Mercado Pago recusou o Pix: "
+            "Mercado Pago recusou o Checkout: "
             f"{response.text}"
         )
 
-    payment_data = response.json()
+    preference = response.json()
 
-    mp_payment_id = payment_data.get(
-        "id"
-    )
+    preference_id = preference.get("id")
 
-    if not mp_payment_id:
+    init_point = preference.get("init_point")
 
-        raise RuntimeError(
-            "Mercado Pago não retornou o ID do pagamento."
-        )
-
-    payment_method = payment_data.get(
-        "point_of_interaction",
-        {}
-    )
-
-    transaction_data = payment_method.get(
-        "transaction_data",
-        {}
-    )
-
-    qr_code = transaction_data.get(
-        "qr_code"
-    )
-
-    qr_code_base64 = transaction_data.get(
-        "qr_code_base64"
-    )
-
-    ticket_url = transaction_data.get(
-        "ticket_url"
-    )
-
-    if not qr_code:
-
-        payment_method_data = payment_data.get(
-            "payment_method",
-            {}
-        )
-
-        qr_code = payment_method_data.get(
-            "qr_code"
-        )
-
-        qr_code_base64 = payment_method_data.get(
-            "qr_code_base64"
-        )
-
-        ticket_url = payment_method_data.get(
-            "ticket_url"
-        )
-
-    if not qr_code:
+    if not preference_id or not init_point:
 
         raise RuntimeError(
-            "Pix criado, mas Mercado Pago não "
-            "retornou o código copia e cola."
+            "Mercado Pago não retornou o link do Checkout."
         )
 
     pagamento = (
         supabase.table("payments")
         .insert({
-            "order_id":
-                str(mp_payment_id),
-            "telegram_user_id":
-                query.from_user.id,
-            "amount":
-                preco,
-            "status":
-                "pending",
-            "external_reference":
-                external_reference,
-            "dias_acesso":
-                dias_acesso,
-            "payment_url":
-                ticket_url,
-            "remarketing_enviado":
-                False,
-            "client_id":
-                client_id,
-            "product_id":
-                product_id,
-            "vip_group_id":
-                vip_group_id,
-            "payment_connection_id":
-                payment_connection_id,
+            "order_id": str(preference_id),
+            "telegram_user_id": query.from_user.id,
+            "amount": preco,
+            "status": "pending",
+            "external_reference": external_reference,
+            "dias_acesso": dias_acesso,
+            "payment_url": init_point,
+            "remarketing_enviado": False,
+            "client_id": client_id,
+            "product_id": product_id,
+            "vip_group_id": vip_group_id,
+            "payment_connection_id": payment_connection_id
         })
         .execute()
     )
@@ -2356,12 +2288,10 @@ async def criar_pix(
     )
 
     return {
-        "mp_payment_id": str(mp_payment_id),
+        "preference_id": str(preference_id),
         "payment_row_id": payment_row_id,
-        "qr_code": qr_code,
-        "qr_code_base64": qr_code_base64,
-        "ticket_url": ticket_url,
-        "external_reference": external_reference,
+        "payment_url": init_point,
+        "external_reference": external_reference
     }
 
 
