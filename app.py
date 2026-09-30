@@ -2396,17 +2396,14 @@ async def botoes(
 
             preco = float(
                 produto["price"]
-            )          
+            ) 
+            
             await query.message.reply_text(
                 f"💰 Valor: R$ {preco:.2f}\n\n"
-                "👇 Clique abaixo para pagar:",
-                reply_markup=InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton(
-                            "💳 PAGAR AGORA",
-                            url=payment_url
-                        )
-                    ]
+                "Prontinho! 🔥 Teu checkout:\n\n"
+                f"{payment_url}\n\n"
+                "Clica no link e efetue o pagamento."
+            )      ]
                 ])
 )
 
