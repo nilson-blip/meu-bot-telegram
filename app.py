@@ -2531,20 +2531,6 @@ parse_mode="HTML"
             f"token={custom_token[:12]}..."
         )
 
-        keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton(
-                    "🟢 Pagar com Pix",
-                    callback_data=f"pix_{product_id}"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    "💳 Pagar com Cartão",
-                    callback_data=f"cartao_{product_id}"
-                )
-            ]
-        ])
 
         preco = float(
             produto["price"]
