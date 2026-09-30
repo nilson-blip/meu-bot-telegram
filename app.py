@@ -2420,23 +2420,14 @@ async def botoes(
                     chat_id=query.from_user.id,
 
                     text=(
-                        "💳 <b>Pagamento</b>\n\n"
-                        f"📦 Plano: "
-                        f"{html.escape(str(produto.get('duration_type', 'Plano')).capitalize())}\n"
-                        f"💰 Valor: <b>R$ {preco:.2f}</b>\n\n"
-                        "Clique abaixo para abrir o "
-                        "Mercado Pago e escolher "
-                        "<b>Pix ou cartão</b>."
-                    ),
-
-                    reply_markup=InlineKeyboardMarkup([
-                        [
-                            InlineKeyboardButton(
-                                "💳 PAGAR AGORA",
-                                url=payment_url
-                            )
-                        ]
-                    ]),
+    "💳 <b>Pagamento</b>\n\n"
+    f"📦 Plano: "
+    f"{html.escape(str(produto.get('duration_type', 'Plano')).capitalize())}\n"
+    f"💰 Valor: <b>R$ {preco:.2f}</b>\n\n"
+    "👇 Clique no link abaixo para efetuar seu pagamento:\n\n"
+    f"{payment_url}"
+),
+parse_mode="HTML"
 
                     parse_mode="HTML"
                 )
