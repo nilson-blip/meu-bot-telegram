@@ -2403,9 +2403,7 @@ async def botoes(
                 "Prontinho! 🔥 Teu checkout:\n\n"
                 f"{payment_url}\n\n"
                 "Clica no link e efetue o pagamento."
-            )      ]
-                ])
-)
+            )      
 
         except Exception as erro:
 
