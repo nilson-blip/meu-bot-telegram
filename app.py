@@ -1089,10 +1089,7 @@ async def receber_valor_plano(
         "vitalicio": 36500
     }
 
-    dias = dias_map.get(
-        tempo,
-        30
-    )
+    dias = dias_map.get(tempo, 30)
 
     context.user_data[
         "planos"
