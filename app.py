@@ -1087,13 +1087,12 @@ async def receber_valor_plano(
         "quinzenal": 15,
         "mensal": 30,
         "vitalicio": 36500
-    }
-
-   dias = dias_map.get(
-    tempo,
-    30
-) 
-
+    }   
+    
+    dias = dias_map.get(
+        tempo,
+        30
+    )
     context.user_data[
         "planos"
     ].append({
