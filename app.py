@@ -2378,6 +2378,23 @@ async def botoes(
 
     await query.answer()
 
+    # ========================================================
+    # IMPORTANTE:
+    # identifica EXATAMENTE qual bot recebeu este Update.
+    #
+    # Antes o código buscava somente pelo client_id.
+    # Como o cliente pode ter vários bots ativos, isso podia
+    # retornar o Botchê principal.
+    # ========================================================
+
+    bot_atual = obter_bot_do_update(update)
+    token_atual = bot_atual.token
+
+    print(
+        "🔎 CALLBACK RECEBIDO | "
+        f"bot_token={token_atual[:12]}..."
+    )
+
     if query.data == "finalizar_tudo":
 
         await query.message.reply_text(
@@ -2386,108 +2403,18 @@ async def botoes(
 
         return
 
-    # Processamento direto do PIX sem pedir e-mail
+    # ========================================================
+    # PIX
+    # ========================================================
+
     if query.data.startswith("pix_"):
 
-        product_id = query.data.replace("pix_", "", 1)
-        client_id = None
-
-        try:
-            produto_res = (
-                supabase.table("products")
-                .select("*")
-                .eq("id", product_id)
-                .eq("status", "active")
-                .single()
-                .execute()
-            )
-
-            if not produto_res.data:
-                raise RuntimeError("Plano não encontrado.")
-
-            produto = produto_res.data
-            client_id = produto["client_id"]
-            custom_token = await obter_token_bot_cliente(client_id)
-
-            async with Bot(token=custom_token) as client_bot:
-                await client_bot.send_message(
-                    chat_id=query.from_user.id,
-                    text="⏳ Gerando seu Pix..."
-                )
-
-            class QueryFake:
-                from_user = query.from_user
-
-            resultado = await criar_pix(
-                product_id,
-                produto,
-                client_id,
-                QueryFake()
-            )
-
-            qr_code = resultado["qr_code"]
-            ticket_url = resultado.get("ticket_url")
-            preco = float(produto["price"])
-
-            texto_pix = (
-                "💠 <b>PIX GERADO!</b>\n\n"
-                f"📦 Plano: "
-                f"{html.escape(str(produto.get('duration_type', 'Plano')).capitalize())}\n"
-                f"💰 Valor: <b>R$ {preco:.2f}</b>\n\n"
-                "📋 <b>PIX COPIA E COLA:</b>\n\n"
-                f"<code>{html.escape(qr_code)}</code>\n\n"
-                "👆 Toque no código acima para copiar "
-                "e cole no aplicativo do seu banco.\n\n"
-                "Depois que o pagamento for aprovado, "
-                "seu acesso será liberado automaticamente."
-            )
-
-            botoes_pix = []
-            if ticket_url:
-                botoes_pix.append([
-                    InlineKeyboardButton("🔗 Abrir Pix", url=ticket_url)
-                ])
-
-            botoes_pix.append([
-                InlineKeyboardButton(
-                    "💳 Pagar com Cartão",
-                    callback_data=f"cartao_{product_id}"
-                )
-            ])
-
-            async with Bot(token=custom_token) as client_bot:
-                await client_bot.send_message(
-                    chat_id=query.from_user.id,
-                    text=texto_pix,
-                    reply_markup=InlineKeyboardMarkup(botoes_pix),
-                    parse_mode="HTML"
-                )
-
-        except Exception as erro:
-            print(f"❌ ERRO AO GERAR PIX: {erro}")
-            try:
-                if client_id:
-                    custom_token = await obter_token_bot_cliente(client_id)
-                else:
-                    custom_token = obter_bot_do_update(update).token
-
-                async with Bot(token=custom_token) as client_bot:
-                    await client_bot.send_message(
-                        chat_id=query.from_user.id,
-                        text="❌ Não consegui gerar o Pix. Tente novamente em alguns instantes."
-                    )
-            except Exception as erro_fallback:
-                print(f"❌ ERRO FALLBACK PIX: {erro_fallback}")
-
-        return
-
-    if query.data.startswith("cartao_"):
-
         product_id = query.data.replace(
-            "cartao_",
+            "pix_",
             "",
             1
         )
+
         client_id = None
 
         try:
@@ -2514,8 +2441,193 @@ async def botoes(
                 )
 
             produto = produto_res.data
+
             client_id = produto["client_id"]
-            custom_token = await obter_token_bot_cliente(client_id)
+
+            # USA O MESMO BOT QUE RECEBEU O CALLBACK
+            custom_token = (
+                await obter_token_bot_cliente(
+                    client_id,
+                    token_atual
+                )
+            )
+
+            print(
+                "✅ BOT DO CLIENTE IDENTIFICADO NO PIX | "
+                f"client_id={client_id} | "
+                f"token={custom_token[:12]}..."
+            )
+
+            async with Bot(
+                token=custom_token
+            ) as client_bot:
+
+                await client_bot.send_message(
+                    chat_id=query.from_user.id,
+                    text="⏳ Gerando seu Pix..."
+                )
+
+            class QueryFake:
+
+                from_user = query.from_user
+
+            resultado = await criar_pix(
+                product_id,
+                produto,
+                client_id,
+                QueryFake()
+            )
+
+            qr_code = resultado["qr_code"]
+
+            ticket_url = resultado.get(
+                "ticket_url"
+            )
+
+            preco = float(
+                produto["price"]
+            )
+
+            texto_pix = (
+                "💠 <b>PIX GERADO!</b>\n\n"
+                f"📦 Plano: "
+                f"{html.escape(str(produto.get('duration_type', 'Plano')).capitalize())}\n"
+                f"💰 Valor: <b>R$ {preco:.2f}</b>\n\n"
+                "📋 <b>PIX COPIA E COLA:</b>\n\n"
+                f"<code>{html.escape(qr_code)}</code>\n\n"
+                "👆 Toque no código acima para copiar "
+                "e cole no aplicativo do seu banco.\n\n"
+                "Depois que o pagamento for aprovado, "
+                "seu acesso será liberado automaticamente."
+            )
+
+            botoes_pix = []
+
+            if ticket_url:
+
+                botoes_pix.append([
+                    InlineKeyboardButton(
+                        "🔗 Abrir Pix",
+                        url=ticket_url
+                    )
+                ])
+
+            botoes_pix.append([
+                InlineKeyboardButton(
+                    "💳 Pagar com Cartão",
+                    callback_data=f"cartao_{product_id}"
+                )
+            ])
+
+            async with Bot(
+                token=custom_token
+            ) as client_bot:
+
+                await client_bot.send_message(
+                    chat_id=query.from_user.id,
+                    text=texto_pix,
+                    reply_markup=InlineKeyboardMarkup(
+                        botoes_pix
+                    ),
+                    parse_mode="HTML"
+                )
+
+        except Exception as erro:
+
+            print(
+                f"❌ ERRO AO GERAR PIX: {erro}"
+            )
+
+            try:
+
+                if client_id:
+
+                    custom_token = (
+                        await obter_token_bot_cliente(
+                            client_id,
+                            token_atual
+                        )
+                    )
+
+                else:
+
+                    custom_token = token_atual
+
+                async with Bot(
+                    token=custom_token
+                ) as client_bot:
+
+                    await client_bot.send_message(
+                        chat_id=query.from_user.id,
+                        text=(
+                            "❌ Não consegui gerar o Pix. "
+                            "Tente novamente em alguns instantes."
+                        )
+                    )
+
+            except Exception as erro_fallback:
+
+                print(
+                    f"❌ ERRO FALLBACK PIX: "
+                    f"{erro_fallback}"
+                )
+
+        return
+
+    # ========================================================
+    # CARTÃO
+    # ========================================================
+
+    if query.data.startswith("cartao_"):
+
+        product_id = query.data.replace(
+            "cartao_",
+            "",
+            1
+        )
+
+        client_id = None
+
+        try:
+
+            produto_res = (
+                supabase.table("products")
+                .select("*")
+                .eq(
+                    "id",
+                    product_id
+                )
+                .eq(
+                    "status",
+                    "active"
+                )
+                .single()
+                .execute()
+            )
+
+            if not produto_res.data:
+
+                raise RuntimeError(
+                    "Plano não encontrado."
+                )
+
+            produto = produto_res.data
+
+            client_id = produto["client_id"]
+
+            # USA O MESMO BOT QUE RECEBEU O CALLBACK
+            custom_token = (
+                await obter_token_bot_cliente(
+                    client_id,
+                    token_atual
+                )
+            )
+
+            print(
+                "✅ BOT DO CLIENTE IDENTIFICADO NO CARTÃO | "
+                f"client_id={client_id} | "
+                f"token={custom_token[:12]}..."
+            )
 
             payment_url = await criar_checkout_cartao(
                 product_id,
@@ -2551,25 +2663,53 @@ async def botoes(
 
         except Exception as erro:
 
-            print(f"❌ ERRO CARTÃO: {erro}")
+            print(
+                f"❌ ERRO CARTÃO: {erro}"
+            )
 
             try:
-                if client_id:
-                    custom_token = await obter_token_bot_cliente(client_id)
-                else:
-                    custom_token = obter_bot_do_update(update).token
 
-                async with Bot(token=custom_token) as client_bot:
+                if client_id:
+
+                    custom_token = (
+                        await obter_token_bot_cliente(
+                            client_id,
+                            token_atual
+                        )
+                    )
+
+                else:
+
+                    custom_token = token_atual
+
+                async with Bot(
+                    token=custom_token
+                ) as client_bot:
+
                     await client_bot.send_message(
                         chat_id=query.from_user.id,
-                        text="❌ Não foi possível gerar o pagamento com cartão. Tente novamente."
+                        text=(
+                            "❌ Não foi possível gerar "
+                            "o pagamento com cartão. "
+                            "Tente novamente."
+                        )
                     )
+
             except Exception as erro_fallback:
-                print(f"❌ ERRO FALLBACK CARTÃO: {erro_fallback}")
+
+                print(
+                    f"❌ ERRO FALLBACK CARTÃO: "
+                    f"{erro_fallback}"
+                )
 
             return
 
+    # ========================================================
+    # ESCOLHA DO PLANO
+    # ========================================================
+
     if not query.data.startswith("comprar_"):
+
         return
 
     client_id = None
@@ -2604,8 +2744,22 @@ async def botoes(
             )
 
         produto = produto_res.data
+
         client_id = produto["client_id"]
-        custom_token = await obter_token_bot_cliente(client_id)
+
+        # USA O MESMO BOT QUE RECEBEU O CALLBACK
+        custom_token = (
+            await obter_token_bot_cliente(
+                client_id,
+                token_atual
+            )
+        )
+
+        print(
+            "✅ BOT DO CLIENTE IDENTIFICADO | "
+            f"client_id={client_id} | "
+            f"token={custom_token[:12]}..."
+        )
 
         keyboard = InlineKeyboardMarkup([
             [
@@ -2622,9 +2776,13 @@ async def botoes(
             ]
         ])
 
-        preco = float(produto["price"])
+        preco = float(
+            produto["price"]
+        )
 
-        async with Bot(token=custom_token) as client_bot:
+        async with Bot(
+            token=custom_token
+        ) as client_bot:
 
             await client_bot.send_message(
                 chat_id=query.from_user.id,
@@ -2641,21 +2799,45 @@ async def botoes(
 
     except Exception as erro:
 
-        print(f"❌ ERRO AO PREPARAR PAGAMENTO: {erro}")
+        print(
+            f"❌ ERRO AO PREPARAR PAGAMENTO: "
+            f"{erro}"
+        )
 
         try:
-            if client_id:
-                custom_token = await obter_token_bot_cliente(client_id)
-            else:
-                custom_token = obter_bot_do_update(update).token
 
-            async with Bot(token=custom_token) as client_bot:
+            if client_id:
+
+                custom_token = (
+                    await obter_token_bot_cliente(
+                        client_id,
+                        token_atual
+                    )
+                )
+
+            else:
+
+                custom_token = token_atual
+
+            async with Bot(
+                token=custom_token
+            ) as client_bot:
+
                 await client_bot.send_message(
                     chat_id=query.from_user.id,
-                    text="❌ Ocorreu um erro ao preparar o pagamento. Por favor, tente novamente."
+                    text=(
+                        "❌ Ocorreu um erro ao preparar "
+                        "o pagamento. Por favor, "
+                        "tente novamente."
+                    )
                 )
+
         except Exception as erro_fallback:
-            print(f"❌ ERRO AO ENVIAR MENSAGEM DE ERRO: {erro_fallback}")
+
+            print(
+                "❌ ERRO AO ENVIAR MENSAGEM "
+                f"DE ERRO: {erro_fallback}"
+            )
 
 
 # ============================================================
