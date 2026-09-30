@@ -2337,26 +2337,14 @@ async def botoes(
     # CHECKOUT MERCADO PAGO
     # ========================================================
 
-    if (
-        query.data.startswith("pix_")
-        or query.data.startswith("cartao_")
-    ):
+        if query.data.startswith("plano_"):
 
-        if query.data.startswith("pix_"):
+        product_id = query.data.replace(
+    "plano_",
+    "",
+    1
+        )
 
-            product_id = query.data.replace(
-                "pix_",
-                "",
-                1
-            )
-
-        else:
-
-            product_id = query.data.replace(
-                "cartao_",
-                "",
-                1
-            )
 
         client_id = None
 
