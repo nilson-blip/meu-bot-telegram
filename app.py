@@ -2384,7 +2384,7 @@ async def botoes(
                 .select("*")
                 .eq("id", product_id)
                 .eq("status", "active")
-                .single()
+                .limit(1)
                 .execute()
             )
 
