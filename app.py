@@ -1867,18 +1867,8 @@ async def start(
         )
 
         return
-
-    
-   if not produtos.data:
-       await update.message.reply_text(
-           "📋 Nenhuma oferta disponível "
-           "no momento."
-       )
-       
-       return
         
-
-    primeiro_prod = produtos.data[0]
+  primeiro_prod = produtos.data[0]
 
     saudacao = html.escape(
         primeiro_prod.get(
