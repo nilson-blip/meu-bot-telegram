@@ -205,20 +205,7 @@ async def obter_token_bot_cliente(client_id: int, token_atual: str = None, bot_i
             )
 
         return token
-
-    # Fallback seguro caso o filtro específico venha vazio
-    fallback_res = (
-        supabase.table("telegram_bots")
-        .select("bot_token")
-        .eq("client_id", client_id)
-        .eq("status", "active")
-        .limit(1)
-        .execute()
-    )
-    if fallback_res.data and fallback_res.data[0].get("bot_token"):
-        token = fallback_res.data[0]["bot_token"]
-        if token != BOT_TOKEN:
-            return token
+        
 
     raise RuntimeError(
         f"Bot ativo não encontrado para o cliente {client_id}."
