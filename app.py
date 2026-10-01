@@ -336,15 +336,15 @@ async def verificar_remarketing():
             if not payment_url:
                 continue
 
-    bot_res = (
-        supabase.table("telegram_bots")
-        .select("bot_token")
-        .eq("id", pagamento["bot_id"])
-        .eq("client_id", client_id)
-        .eq("status", "active")
-        .single()
-        .execute()
-          ) 
+            bot_res = (
+            supabase.table("telegram_bots")
+            .select("bot_token")
+            .eq("id", pagamento["bot_id"])
+            .eq("client_id", client_id)
+            .eq("status", "active")
+            .single()
+            .execute()
+        )
 
 if not bot_res.data:
     raise RuntimeError(
