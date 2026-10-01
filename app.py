@@ -1860,14 +1860,16 @@ produtos = (
     .execute()
     )
 
-    if not produtos.data:
+    
+if not produtos.data:
 
-        await update.message.reply_text(
-            "📋 Nenhuma oferta disponível "
-            "no momento."
-        )
+    await update.message.reply_text(
+        "📋 Nenhuma oferta disponível "
+        "no momento."
+    )
 
-        return
+    return
+        
 
     primeiro_prod = produtos.data[0]
 
