@@ -1868,7 +1868,7 @@ async def start(
 
         return
         
-  primeiro_prod = produtos.data[0]
+    primeiro_prod = produtos.data[0]
 
     saudacao = html.escape(
         primeiro_prod.get(
