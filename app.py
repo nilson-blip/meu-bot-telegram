@@ -1592,6 +1592,33 @@ async def concluir_configuracao(
     try:
 
         (
+                    # ============================================================
+        # IDENTIFICAÇÃO DO BOT DO CLIENTE
+        # ============================================================
+
+        custom_bot_token = dados.get("bot_token")
+        custom_bot_id = dados.get("bot_id")
+        custom_bot_username = dados.get("bot_username")
+        custom_bot_name = dados.get("bot_name")
+
+        if not custom_bot_token or not custom_bot_id:
+
+            raise RuntimeError(
+                "Dados do bot do cliente não encontrados."
+            )
+
+        if custom_bot_token == BOT_TOKEN:
+
+            raise RuntimeError(
+                "O bot do cliente não pode usar o "
+                "mesmo token do Botchê principal."
+            )
+
+        # ============================================================
+        # SALVA OS PRODUTOS VINCULADOS AO BOT CORRETO
+        # ============================================================
+
+        (
             supabase.table("products")
             .update({
                 "status": "inactive"
@@ -1599,6 +1626,10 @@ async def concluir_configuracao(
             .eq(
                 "client_id",
                 client_id
+            )
+            .eq(
+                "bot_id",
+                custom_bot_id
             )
             .execute()
         )
@@ -1614,29 +1645,41 @@ async def concluir_configuracao(
 
             prod_payload = {
                 "client_id": client_id,
+
+                # IMPORTANTE:
+                # cada produto pertence a um bot específico
+                "bot_id": custom_bot_id,
+
                 "title": dados.get(
                     "produto_nome",
                     "Produto VIP"
                 ),
+
                 "greeting_message": dados.get(
                     "saudacao",
                     "Seja bem-vindo!"
                 ),
+
                 "price": float(
                     p["valor"]
                 ),
+
                 "duration_type": str(
                     p["tempo"]
                 ),
+
                 "duration_days": int(
                     p["dias"]
                 ),
+
                 "media_file_id": dados.get(
                     "media_file_id"
                 ),
+
                 "media_type": dados.get(
                     "media_type"
                 ),
+
                 "status": "active",
             }
 
@@ -1649,6 +1692,64 @@ async def concluir_configuracao(
             (
                 supabase.table("products")
                 .insert(prod_payload)
+                .execute()
+            )
+
+        # ============================================================
+        # CADASTRA / ATUALIZA O BOT DO CLIENTE
+        # ============================================================
+
+        bot_existente = (
+            supabase.table("telegram_bots")
+            .select(
+                "id, client_id, bot_token"
+            )
+            .eq(
+                "bot_id",
+                custom_bot_id
+            )
+            .limit(1)
+            .execute()
+        )
+
+        if bot_existente.data:
+
+            bot_atual = bot_existente.data[0]
+
+            if bot_atual["client_id"] != client_id:
+
+                raise RuntimeError(
+                    "Esse bot do Telegram já está "
+                    "vinculado a outro cliente."
+                )
+
+            (
+                supabase.table("telegram_bots")
+                .update({
+                    "username": custom_bot_username,
+                    "bot_name": custom_bot_name,
+                    "bot_token": custom_bot_token,
+                    "status": "active"
+                })
+                .eq(
+                    "id",
+                    bot_atual["id"]
+                )
+                .execute()
+            )
+
+        else:
+
+            (
+                supabase.table("telegram_bots")
+                .insert({
+                    "client_id": client_id,
+                    "bot_id": custom_bot_id,
+                    "username": custom_bot_username,
+                    "bot_name": custom_bot_name,
+                    "bot_token": custom_bot_token,
+                    "status": "active"
+                })
                 .execute()
             )
 
