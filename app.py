@@ -1842,25 +1842,31 @@ async def start(
     ]
 
     
-produtos = (
-    supabase.table("products")
-    .select("*")
-    .eq(
-        "client_id",
-        client_id
+    produtos = (
+        supabase.table("products")
+        .select("*")
+        .eq(
+            "client_id",
+            client_id
+        )
+        .eq(
+            "bot_id",
+            bot_telegram_id
+        )
+        .eq(
+            "status",
+            "active"
+        )
+        .execute()
     )
-    .eq(
-        "bot_id",
-        bot_telegram_id
-    )
-    .eq(
-        "status",
-        "active"
-    )
-    .execute()
-    )
-    
-    return
+
+    if not produtos.data:
+        await update.message.reply_text(
+            "📋 Nenhuma oferta disponível "
+            "no momento."
+        )
+
+        return
 
     
 if not produtos.data:
