@@ -2134,8 +2134,25 @@ async def criar_checkout_marketplace(
     product_id,
     produto,
     client_id,
-    query
-):
+    query,
+    token_atual
+):   
+    bot_res = (
+        supabase.table("telegram_bots")
+        .select("id")
+        .eq("client_id", client_id)
+        .eq("bot_token", token_atual)
+        .eq("status", "active")
+        .single()
+        .execute()
+    )
+
+    if not bot_res.data:
+        raise RuntimeError(
+            "Bot cliente não encontrado para este token."
+        )
+
+    bot_id = bot_res.data["id"]
 
     conexao = (
         supabase.table("payment_connections")
@@ -2276,6 +2293,7 @@ async def criar_checkout_marketplace(
             "product_id": product_id,
             "vip_group_id": vip_group_id,
             "payment_connection_id": payment_connection_id
+            "bot_id": bot_id
         })
         .execute()
     )
