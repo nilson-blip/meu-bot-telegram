@@ -2292,7 +2292,7 @@ async def criar_checkout_marketplace(
             "client_id": client_id,
             "product_id": product_id,
             "vip_group_id": vip_group_id,
-            "payment_connection_id": payment_connection_id
+            "payment_connection_id": payment_connection_id,
             "bot_id": bot_id
         })
         .execute()
