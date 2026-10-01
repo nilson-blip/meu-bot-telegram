@@ -2394,7 +2394,7 @@ async def botoes(
                     "Plano não encontrado."
                 )
 
-            produto = produto_res.data
+            produto = produto_res.data[0]
 
             client_id = produto["client_id"]
 
