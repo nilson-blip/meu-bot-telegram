@@ -1859,6 +1859,8 @@ produtos = (
     )
     .execute()
     )
+    
+    return
 
     
 if not produtos.data:
