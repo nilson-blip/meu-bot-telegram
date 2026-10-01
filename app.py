@@ -336,23 +336,22 @@ async def verificar_remarketing():
             if not payment_url:
                 continue
 
-           
-bot_res = (
-            
-    supabase.table("telegram_bots")
-            .select("bot_token")
-            .eq("id", pagamento["bot_id"])
-            .eq("client_id", client_id)
-            .eq("status", "active")
-            .single()
-            .execute()
-)
+            bot_res = (
+                supabase.table("telegram_bots")
+                .select("bot_token")
+                .eq("id", pagamento["bot_id"])
+                .eq("client_id", client_id)
+                .eq("status", "active")
+                .single()
+                .execute()
+            )
+
             if not bot_res.data:
                 raise RuntimeError(
                     "Bot do pagamento não encontrado ou inativo."
-            )
+                )
 
-custom_token = bot_res.data["bot_token"]
+            custom_token = bot_res.data["bot_token"]
 
             async with Bot(
                 token=custom_token
@@ -1099,8 +1098,8 @@ async def receber_valor_plano(
         "quinzenal": 15,
         "mensal": 30,
         "vitalicio": 36500
-    }   
-    
+    }
+
     dias = dias_map.get(
         tempo,
         30
@@ -1913,11 +1912,11 @@ async def start(
         )
 
         botoes_planos.append([
-    InlineKeyboardButton(
-        f"⚡ Plano {tempo} - R$ {preco:.2f}",
-        callback_data=f"plano_{prod['id']}"
-    )
-])
+            InlineKeyboardButton(
+                f"⚡ Plano {tempo} - R$ {preco:.2f}",
+                callback_data=f"plano_{prod['id']}"
+            )
+        ])
 
     keyboard = InlineKeyboardMarkup(
         botoes_planos
@@ -2148,7 +2147,7 @@ async def criar_checkout_marketplace(
     client_id,
     query,
     token_atual
-):   
+):
     bot_res = (
         supabase.table("telegram_bots")
         .select("id")
@@ -2427,14 +2426,14 @@ async def botoes(
 
             preco = float(
                 produto["price"]
-            ) 
-            
+            )
+
             await query.message.reply_text(
                 f"💰 Valor: R$ {preco:.2f}\n\n"
                 "Prontinho! 🔥 Teu checkout:\n\n"
                 f"{payment_url}\n\n"
                 "Clica no link e efetue o pagamento."
-            )      
+            )
 
         except Exception as erro:
 
@@ -2535,7 +2534,6 @@ async def botoes(
             f"client_id={client_id} | "
             f"token={custom_token[:12]}..."
         )
-
 
         preco = float(
             produto["price"]
