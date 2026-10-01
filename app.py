@@ -181,7 +181,7 @@ def obter_bot_do_update(update: Update):
     )
 
 
-async def obter_token_bot_cliente(client_id: int, token_atual: str = None) -> str:
+async def obter_token_bot_cliente(client_id: int, token_atual: str = None, bot_id: int = None) -> str:
     query = (
         supabase.table("telegram_bots")
         .select("bot_token")
@@ -189,9 +189,9 @@ async def obter_token_bot_cliente(client_id: int, token_atual: str = None) -> st
         .eq("status", "active")
     )
 
-    # Se sabemos qual bot recebeu o Update,
-    # buscamos exatamente esse bot.
-    if token_atual:
+    if bot_id:
+        query = query.eq("id", bot_id)
+    elif token_atual:
         query = query.eq("bot_token", token_atual)
 
     bot_res = query.limit(1).execute()
@@ -205,6 +205,20 @@ async def obter_token_bot_cliente(client_id: int, token_atual: str = None) -> st
             )
 
         return token
+
+    # Fallback seguro caso o filtro específico venha vazio
+    fallback_res = (
+        supabase.table("telegram_bots")
+        .select("bot_token")
+        .eq("client_id", client_id)
+        .eq("status", "active")
+        .limit(1)
+        .execute()
+    )
+    if fallback_res.data and fallback_res.data[0].get("bot_token"):
+        token = fallback_res.data[0]["bot_token"]
+        if token != BOT_TOKEN:
+            return token
 
     raise RuntimeError(
         f"Bot ativo não encontrado para o cliente {client_id}."
@@ -333,25 +347,17 @@ async def verificar_remarketing():
                 "client_id"
             )
 
+            bot_id_pagamento = pagamento.get(
+                "bot_id"
+            )
+
             if not payment_url:
                 continue
 
-            bot_res = (
-                supabase.table("telegram_bots")
-                .select("bot_token")
-                .eq("id", pagamento["bot_id"])
-                .eq("client_id", client_id)
-                .eq("status", "active")
-                .single()
-                .execute()
+            custom_token = await obter_token_bot_cliente(
+                client_id=client_id,
+                bot_id=bot_id_pagamento
             )
-
-            if not bot_res.data:
-                raise RuntimeError(
-                    "Bot do pagamento não encontrado ou inativo."
-                )
-
-            custom_token = bot_res.data["bot_token"]
 
             async with Bot(
                 token=custom_token
@@ -1193,7 +1199,7 @@ async def decisao_mais_planos(
     ])
 
     await query.message.reply_text(
-        "🖼️ <b>Passo 5 de 6: "
+        "🖼️️ <b>Passo 5 de 6: "
         "Mídia Promocional (Opcional)</b>\n\n"
         "Envie uma foto ou vídeo para "
         "ser exibido junto com a oferta "
@@ -1591,11 +1597,6 @@ async def concluir_configuracao(
 
     try:
 
-        
-        #============================================================
-        # IDENTIFICAÇÃO DO BOT DO CLIENTE
-        # ============================================================
-
         custom_bot_token = dados.get("bot_token")
         custom_bot_id = dados.get("bot_id")
         custom_bot_username = dados.get("bot_username")
@@ -1613,10 +1614,6 @@ async def concluir_configuracao(
                 "O bot do cliente não pode usar o "
                 "mesmo token do Botchê principal."
             )
-
-        # ============================================================
-        # SALVA OS PRODUTOS VINCULADOS AO BOT CORRETO
-        # ============================================================
 
         (
             supabase.table("products")
@@ -1645,41 +1642,30 @@ async def concluir_configuracao(
 
             prod_payload = {
                 "client_id": client_id,
-
-                # IMPORTANTE:
-                # cada produto pertence a um bot específico
                 "bot_id": custom_bot_id,
-
                 "title": dados.get(
                     "produto_nome",
                     "Produto VIP"
                 ),
-
                 "greeting_message": dados.get(
                     "saudacao",
                     "Seja bem-vindo!"
                 ),
-
                 "price": float(
                     p["valor"]
                 ),
-
                 "duration_type": str(
                     p["tempo"]
                 ),
-
                 "duration_days": int(
                     p["dias"]
                 ),
-
                 "media_file_id": dados.get(
                     "media_file_id"
                 ),
-
                 "media_type": dados.get(
                     "media_type"
                 ),
-
                 "status": "active",
             }
 
@@ -1693,82 +1679,6 @@ async def concluir_configuracao(
                 supabase.table("products")
                 .insert(prod_payload)
                 .execute()
-            )
-
-        # ============================================================
-        # CADASTRA / ATUALIZA O BOT DO CLIENTE
-        # ============================================================
-
-        bot_existente = (
-            supabase.table("telegram_bots")
-            .select(
-                "id, client_id, bot_token"
-            )
-            .eq(
-                "bot_id",
-                custom_bot_id
-            )
-            .limit(1)
-            .execute()
-        )
-
-        if bot_existente.data:
-
-            bot_atual = bot_existente.data[0]
-
-            if bot_atual["client_id"] != client_id:
-
-                raise RuntimeError(
-                    "Esse bot do Telegram já está "
-                    "vinculado a outro cliente."
-                )
-
-            (
-                supabase.table("telegram_bots")
-                .update({
-                    "username": custom_bot_username,
-                    "bot_name": custom_bot_name,
-                    "bot_token": custom_bot_token,
-                    "status": "active"
-                })
-                .eq(
-                    "id",
-                    bot_atual["id"]
-                )
-                .execute()
-            )
-
-        else:
-
-            (
-                supabase.table("telegram_bots")
-                .insert({
-                    "client_id": client_id,
-                    "bot_id": custom_bot_id,
-                    "username": custom_bot_username,
-                    "bot_name": custom_bot_name,
-                    "bot_token": custom_bot_token,
-                    "status": "active"
-                })
-                .execute()
-            )
-
-        custom_bot_token = dados.get("bot_token")
-        custom_bot_id = dados.get("bot_id")
-        custom_bot_username = dados.get("bot_username")
-        custom_bot_name = dados.get("bot_name")
-
-        if not custom_bot_token or not custom_bot_id:
-
-            raise RuntimeError(
-                "Dados do bot do cliente não encontrados."
-            )
-
-        if custom_bot_token == BOT_TOKEN:
-
-            raise RuntimeError(
-                "O bot do cliente não pode usar o "
-                "mesmo token do Botchê principal."
             )
 
         bot_existente = (
@@ -2437,15 +2347,6 @@ async def botoes(
 
     await query.answer()
 
-    # ========================================================
-    # IMPORTANTE:
-    # identifica EXATAMENTE qual bot recebeu este Update.
-    #
-    # Antes o código buscava somente pelo client_id.
-    # Como o cliente pode ter vários bots ativos, isso podia
-    # retornar o Botchê principal.
-    # ========================================================
-
     bot_atual = obter_bot_do_update(update)
     token_atual = bot_atual.token
 
@@ -2622,7 +2523,6 @@ async def botoes(
 
         client_id = produto["client_id"]
 
-        # USA O MESMO BOT QUE RECEBEU O CALLBACK
         custom_token = (
             await obter_token_bot_cliente(
                 client_id,
