@@ -1862,7 +1862,6 @@ produtos = (
 
     
 if not produtos.data:
-
     await update.message.reply_text(
         "📋 Nenhuma oferta disponível "
         "no momento."
