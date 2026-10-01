@@ -2406,7 +2406,8 @@ async def botoes(
                     product_id,
                     produto,
                     client_id,
-                    query
+                    query,
+                    token_atual
                 )
             )
 
