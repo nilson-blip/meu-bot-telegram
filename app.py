@@ -1858,7 +1858,8 @@ produtos = (
         "active"
     )
     .execute()
-)
+    )
+
     if not produtos.data:
 
         await update.message.reply_text(
