@@ -1812,6 +1812,7 @@ async def start(
 
     bot_atual = obter_bot_do_update(update)
     token_atual = bot_atual.token
+    bot_telegram_id = bot_atual.id
 
     bot_data = (
         supabase.table("telegram_bots")
@@ -1840,20 +1841,24 @@ async def start(
         "client_id"
     ]
 
-    produtos = (
-        supabase.table("products")
-        .select("*")
-        .eq(
-            "client_id",
-            client_id
-        )
-        .eq(
-            "status",
-            "active"
-        )
-        .execute()
+    
+produtos = (
+    supabase.table("products")
+    .select("*")
+    .eq(
+        "client_id",
+        client_id
     )
-
+    .eq(
+        "bot_id",
+        bot_telegram_id
+    )
+    .eq(
+        "status",
+        "active"
+    )
+    .execute()
+)
     if not produtos.data:
 
         await update.message.reply_text(
