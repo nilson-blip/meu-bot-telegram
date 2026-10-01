@@ -336,11 +336,22 @@ async def verificar_remarketing():
             if not payment_url:
                 continue
 
-            custom_token = (
-                await obter_token_bot_cliente(
-                    client_id
-                )
-            )
+    bot_res = (
+        supabase.table("telegram_bots")
+        .select("bot_token")
+        .eq("id", pagamento["bot_id"])
+        .eq("client_id", client_id)
+        .eq("status", "active")
+        .single()
+        .execute()
+          ) 
+
+if not bot_res.data:
+    raise RuntimeError(
+        "Bot do pagamento não encontrado ou inativo."
+    )
+
+custom_token = bot_res.data["bot_token"]
 
             async with Bot(
                 token=custom_token
