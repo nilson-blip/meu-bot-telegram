@@ -345,11 +345,10 @@ async def verificar_remarketing():
             .single()
             .execute()
         )
-
-if not bot_res.data:
-    raise RuntimeError(
-        "Bot do pagamento não encontrado ou inativo."
-    )
+            if not bot_res.data:
+                raise RuntimeError(
+                    "Bot do pagamento não encontrado ou inativo."
+            )
 
 custom_token = bot_res.data["bot_token"]
 
