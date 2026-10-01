@@ -2149,7 +2149,7 @@ async def criar_checkout_cartao(
 
 
 # ============================================================
-# CRIAR PIX DIRETO - SPLIT (COM COPIA E COLA NO TELEGRAM)
+# CRIAR CHECKOUT PRO COM SPLIT DE 5% (MERCADO PAGO)
 # ============================================================
 
 async def criar_checkout_marketplace(
@@ -2217,22 +2217,36 @@ async def criar_checkout_marketplace(
         f"{uuid.uuid4().hex}"
     )
 
-    # Payload para o endpoint de pagamentos diretos (/v1/payments) com Pix
-    payload = {
-        "transaction_amount": preco,
-        "description": f"Acesso VIP - {str(produto.get('title', 'Produto'))}",
-        "payment_method_id": "pix",
-        "payer": {
-            "email": f"user_{query.from_user.id}@telegram.bot",
-            "first_name": query.from_user.first_name or "Cliente",
-            "last_name": query.from_user.last_name or ""
-        },
+    # PAYLOAD USANDO PREFERÊNCIAS (ÚNICA FORMA QUE ACEITA SPLIT NO MP)
+    preference_data = {
+        "items": [
+            {
+                "id": str(product_id),
+                "title": f"Acesso VIP - {str(produto.get('title', 'Produto'))}",
+                "currency_id": "BRL",
+                "quantity": 1,
+                "unit_price": preco
+            }
+        ],
         "marketplace_fee": marketplace_fee,
+        # Opcional: Força o Pix como método principal e oculta cartões se quiser focar só em Pix
+        "payment_methods": {
+            "excluded_payment_types": [
+                {"id": "ticket"}
+            ],
+            "default_payment_method_id": "pix"
+        },
         "external_reference": external_reference,
         "notification_url": (
             "https://meu-bot-telegram-production-d9c3.up.railway.app"
             "/mercadopago"
-        )
+        ),
+        "back_urls": {
+            "success": "https://meu-bot-telegram-production-d9c3.up.railway.app/",
+            "failure": "https://meu-bot-telegram-production-d9c3.up.railway.app/",
+            "pending": "https://meu-bot-telegram-production-d9c3.up.railway.app/"
+        },
+        "auto_return": "approved"
     }
 
     async with httpx.AsyncClient(
@@ -2240,50 +2254,41 @@ async def criar_checkout_marketplace(
     ) as client:
 
         response = await client.post(
-            "https://api.mercadopago.com/v1/payments",
+            "https://api.mercadopago.com/checkout/preferences",
             headers={
                 "Authorization": f"Bearer {client_access_token}",
                 "Content-Type": "application/json",
-                "X-Idempotency-Key": str(uuid.uuid4())
             },
-            json=payload,
+            json=preference_data,
             timeout=30.0
         )
 
     if response.status_code not in [200, 201]:
         raise RuntimeError(
-            "Mercado Pago recusou o Pix Direto: "
+            "Mercado Pago recusou a Preferência de Checkout: "
             f"{response.text}"
         )
 
-    payment_data = response.json()
-    payment_id_mp = str(payment_data.get("id"))
-    
-    # Dados específicos do Pix retornado pelo Mercado Pago
-    point_of_interaction = payment_data.get("point_of_interaction", {})
-    transaction_data = point_of_interaction.get("transaction_data", {})
-    
-    qr_code = transaction_data.get("qr_code") # O Pix Copia e Cola
-    qr_code_base64 = transaction_data.get("qr_code_base64") # Imagem em base64 (opcional)
-    ticket_url = transaction_data.get("ticket_url") # Link web de contingência se precisar
+    preference_data_mp = response.json()
+    preference_id = str(preference_data_mp.get("id"))
+    payment_url = preference_data_mp.get("init_point") or preference_data_mp.get("sandbox_init_point")
 
-    if not qr_code:
+    if not payment_url:
         raise RuntimeError(
-            "Mercado Pago gerou o pagamento, mas não retornou o código Pix Copia e Cola."
+            "Mercado Pago criou a preferência, mas não retornou o link de pagamento (init_point)."
         )
 
-    # Salvando na tabela payments (ajustado para guardar o qr_code e o id do pagamento do MP)
+    # Salvando na tabela payments (compatível com a estrutura de preferências)
     pagamento = (
         supabase.table("payments")
         .insert({
-            "order_id": payment_id_mp,
+            "order_id": preference_id,
             "telegram_user_id": query.from_user.id,
             "amount": preco,
             "status": "pending",
             "external_reference": external_reference,
             "dias_acesso": dias_acesso,
-            "payment_url": ticket_url or "",
-            "qr_code_pix": qr_code, # Dica: certifique-se de ter essa coluna ou mande direto
+            "payment_url": payment_url,
             "remarketing_enviado": False,
             "client_id": client_id,
             "product_id": product_id,
@@ -2301,12 +2306,12 @@ async def criar_checkout_marketplace(
     )
 
     return {
-        "payment_id_mp": payment_id_mp,
+        "payment_id_mp": preference_id,
         "payment_row_id": payment_row_id,
-        "qr_code": qr_code,
-        "qr_code_base64": qr_code_base64,
+        "payment_url": payment_url,
         "external_reference": external_reference
     }
+
 
 
 
