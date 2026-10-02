@@ -1849,7 +1849,7 @@ await update.message.reply_text(
     f"DEBUG: bot={bot_telegram_id} | cliente={client_id}"
 )
 
-    produtos = (
+ produtos = (
         supabase.table("products")
         .select("*")
         .eq("client_id", client_id)
