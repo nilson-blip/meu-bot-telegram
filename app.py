@@ -1833,10 +1833,11 @@ async def start(
     )
 
     if not bot_data.data:
-            await update.message.reply_text(
+     
+        await update.message.reply_text(
             "👋 Este bot ainda não está configurado."
         )
-
+        
         return
 
     client_id = bot_data.data[0][
