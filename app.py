@@ -1848,7 +1848,6 @@ client_id = bot_data.data[0][
 await update.message.reply_text(
     f"DEBUG: bot={bot_telegram_id} | cliente={client_id}"
 )
-    
     produtos = (
         supabase.table("products")
         .select("*")
