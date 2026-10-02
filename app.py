@@ -1832,7 +1832,7 @@ async def start(
         .execute()
     )
 
-    if not bot_data.data:
+        if not bot_data.data:
 
         await update.message.reply_text(
             "👋 Este bot ainda não está configurado."
@@ -1840,36 +1840,38 @@ async def start(
 
         return
 
-    
-client_id = bot_data.data[0][
-    "client_id"
-]
-
-await update.message.reply_text(
-    f"DEBUG: bot={bot_telegram_id} | 
-    cliente={client_id}"
-)    client_id = bot_data.data[0][
+    client_id = bot_data.data[0][
         "client_id"
     ]
-
-    await update.message.reply_text(
-        f"DEBUG: bot={bot_telegram_id} | cliente={client_id}"
-    )
 
     produtos = (
         supabase.table("products")
         .select("*")
-        .eq("client_id", client_id)
-        .eq("bot_id", bot_telegram_id)
-        .eq("status", "active")
+        .eq(
+            "client_id",
+            client_id
+        )
+        .eq(
+            "bot_id",
+            bot_telegram_id
+        )
+        .eq(
+            "status",
+            "active"
+        )
         .execute()
     )
 
     if not produtos.data:
+
         await update.message.reply_text(
-            "📋 Nenhuma oferta disponível no momento."
+            "📋 Nenhuma oferta disponível "
+            "no momento."
         )
+
         return
+
+    primeiro_prod = produtos.data[0]
         
     primeiro_prod = produtos.data[0]
 
