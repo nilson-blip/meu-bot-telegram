@@ -1846,7 +1846,8 @@ client_id = bot_data.data[0][
 ]
 
 await update.message.reply_text(
-    f"DEBUG: bot={bot_telegram_id} | cliente={client_id}"
+    f"DEBUG: bot={bot_telegram_id} | 
+    cliente={client_id}"
 )    client_id = bot_data.data[0][
         "client_id"
     ]
