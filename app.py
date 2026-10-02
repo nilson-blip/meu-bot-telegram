@@ -1814,8 +1814,8 @@ async def start(
     token_atual = bot_atual.token
     bot_telegram_id = bot_atual.id
     await update.message.reply_text(
-    f"DEBUG: {bot_telegram_id}"
-    )
+    f"DEBUG: bot={bot_telegram_id} | cliente={client_id}"
+)
 
     bot_data = (
         supabase.table("telegram_bots")
