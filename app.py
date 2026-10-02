@@ -1849,30 +1849,19 @@ await update.message.reply_text(
     f"DEBUG: bot={bot_telegram_id} | cliente={client_id}"
 )
 
-produtos = (
+    produtos = (
         supabase.table("products")
         .select("*")
-        .eq(
-            "client_id",
-            client_id
-        )
-        .eq(
-            "bot_id",
-            bot_telegram_id
-        )
-        .eq(
-            "status",
-            "active"
-        )
+        .eq("client_id", client_id)
+        .eq("bot_id", bot_telegram_id)
+        .eq("status", "active")
         .execute()
     )
 
     if not produtos.data:
         await update.message.reply_text(
-            "📋 Nenhuma oferta disponível "
-            "no momento."
+            "📋 Nenhuma oferta disponível no momento."
         )
-
         return
         
     primeiro_prod = produtos.data[0]
