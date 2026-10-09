@@ -1401,7 +1401,7 @@ async def verificar_grupo_vip_cliente(
                 if chat_id:
                     break
 
-                if chat_id:
+         if chat_id:
             telegram_user_id = update.effective_user.id
 
             client_id = obter_ou_criar_cliente(
