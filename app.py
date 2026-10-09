@@ -1939,7 +1939,7 @@ elif (
             parse_mode="HTML"
         )
 
-    else:
+else:
 
         await update.message.reply_text(
             text=texto_oferta,
