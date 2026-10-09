@@ -1859,11 +1859,10 @@ if not produtos.data:
         await update.message.reply_text(
             "📋 Nenhuma oferta disponível "
             "no momento."
-        )
-
+        )      
+    
         return
 
-        
     primeiro_prod = produtos.data[0]
 
     saudacao = html.escape(
@@ -1872,18 +1871,12 @@ if not produtos.data:
     )
 
     titulo = html.escape(
-        primeiro_prod.get(
-            "title"
-        ) or "Acesso VIP Exclusivo"
+        primeiro_prod.get("title")
+        or "Acesso VIP Exclusivo"
     )
 
-    media_id = primeiro_prod.get(
-        "media_file_id"
-    )
-
-    media_type = primeiro_prod.get(
-        "media_type"
-    )
+    media_id = primeiro_prod.get("media_file_id")
+    media_type = primeiro_prod.get("media_type")
 
     texto_oferta = (
         f"{saudacao}\n\n"
