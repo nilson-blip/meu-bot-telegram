@@ -1821,14 +1821,13 @@ bot_data = (
     .eq("status", "active")
     .limit(1)
     .execute()
-)
+)  
 
 if not bot_data.data:
-    await update.message.reply_text(
-        "👋 Este bot ainda não está configurado."
-    )
-    
-    return
+        await update.message.reply_text(
+            "👋 Este bot ainda não está configurado."
+        )
+        return
 
 client_id = bot_data.data[0]["client_id"]
 
