@@ -1915,7 +1915,7 @@ keyboard = InlineKeyboardMarkup(
         botoes_planos
     )
 
-    if (
+if (
         media_id
         and media_type == "photo"
     ):
