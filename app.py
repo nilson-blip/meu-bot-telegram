@@ -1910,8 +1910,8 @@ for prod in produtos.data:
                 callback_data=f"plano_{prod['id']}"
             )
         ])
-
-    keyboard = InlineKeyboardMarkup(
+    
+keyboard = InlineKeyboardMarkup(
         botoes_planos
     )
 
