@@ -1811,30 +1811,29 @@ async def start(
     )
 
     token_atual = bot_atual.token
-bot_telegram_id = bot_atual.id
-
+bot_telegram_id = bot_atual.id    
 bot_data = (
-    supabase.table("telegram_bots")
-    .select("id, client_id, bot_id, bot_token")
-    .eq("bot_id", bot_telegram_id)
-    .eq("bot_token", token_atual)
-    .eq("status", "active")
-    .limit(1)
-    .execute()
-)  
+        supabase.table("telegram_bots")
+        .select("id, client_id, bot_id, bot_token")
+        .eq("bot_id", bot_telegram_id)
+        .eq("bot_token", token_atual)
+        .eq("status", "active")
+        .limit(1)
+        .execute()
+    )
 
-if not bot_data.data:
+    if not bot_data.data:
         await update.message.reply_text(
             "👋 Este bot ainda não está configurado."
         )
         return
 
-client_id = bot_data.data[0]["client_id"]
+    client_id = bot_data.data[0]["client_id"]
 
-print(
-    f"🔎 START | bot_id={bot_telegram_id} "
-    f"| client_id={client_id}"
-)
+    print(
+        f"🔎 START | bot_id={bot_telegram_id} "
+        f"| client_id={client_id}"
+    )
 
 produtos = (
     supabase.table("products")
