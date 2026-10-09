@@ -1854,7 +1854,7 @@ produtos = (
         .execute()
     )
 
-    if not produtos.data:
+if not produtos.data:
 
         await update.message.reply_text(
             "📋 Nenhuma oferta disponível "
