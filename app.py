@@ -1880,7 +1880,7 @@ media_id = primeiro_prod.get("media_file_id")
     
 media_type = primeiro_prod.get("media_type")
 
-    texto_oferta = (
+texto_oferta = (
         f"{saudacao}\n\n"
         f"🌟 <b>{titulo}</b>\n\n"
         "👇 Escolha abaixo o plano ideal para você:"
