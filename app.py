@@ -1927,7 +1927,7 @@ if (
             parse_mode="HTML"
         )
 
-    elif (
+elif (
         media_id
         and media_type == "video"
     ):
