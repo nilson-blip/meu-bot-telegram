@@ -1871,7 +1871,7 @@ saudacao = html.escape(
         or "Seja bem-vindo!"
     )
 
-    titulo = html.escape(
+titulo = html.escape(
         primeiro_prod.get("title")
         or "Acesso VIP Exclusivo"
     )
