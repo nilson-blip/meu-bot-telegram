@@ -1864,12 +1864,11 @@ if not produtos.data:
         return
 
         
-    primeiro_prod = produtos.data[0]
+        primeiro_prod = produtos.data[0]
 
     saudacao = html.escape(
-        primeiro_prod.get(
-            "greeting_message"
-        ) or "Seja bem-vindo!"
+        primeiro_prod.get("greeting_message")
+        or "Seja bem-vindo!"
     )
 
     titulo = html.escape(
