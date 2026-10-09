@@ -1825,9 +1825,9 @@ if not bot_data.data:
     
 client_id = bot_data.data[0]["client_id"]
 
-    print(
-        f"🔎 START | bot_id={bot_telegram_id} "
-        f"| client_id={client_id}"
+print(
+    f"🔎 START | bot_id={bot_telegram_id} "
+    f"| client_id={client_id}"
     )
 
 produtos = (
