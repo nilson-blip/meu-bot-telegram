@@ -1863,7 +1863,6 @@ if not produtos.data:
 
         return
 
-    primeiro_prod = produtos.data[0]
         
     primeiro_prod = produtos.data[0]
 
