@@ -1836,11 +1836,11 @@ print(
     f"| client_id={client_id}"
 )
 
-    produtos = (
-        supabase.table("products")
-        .select("*")
-        .eq(
-            "client_id",
+produtos = (
+    supabase.table("products")
+    .select("*")
+    .eq(
+        "client_id",
             client_id
         )
         .eq(
