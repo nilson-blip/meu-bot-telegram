@@ -1865,7 +1865,7 @@ if not produtos.data:
     
 primeiro_prod = produtos.data[0]
 
-    saudacao = html.escape(
+saudacao = html.escape(
  primeiro_prod.get("greeting_message")
         or "Seja bem-vindo!"
     )
