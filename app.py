@@ -1886,9 +1886,9 @@ texto_oferta = (
         "👇 Escolha abaixo o plano ideal para você:"
     )
 
-    botoes_planos = []
+botoes_planos = []
 
-    for prod in produtos.data:
+for prod in produtos.data:
 
         tempo = str(
             prod.get(
