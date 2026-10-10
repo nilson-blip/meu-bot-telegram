@@ -1795,16 +1795,16 @@ async def concluir_configuracao(
 # /START
 # ============================================================
 
+
 async def start(
     update: Update,
     context
 ):
-
     await update.message.reply_text(
         "⏳ Carregando planos...",
         reply_markup=ReplyKeyboardRemove()
     )
-    
+
     token_atual = bot_atual.token
     bot_telegram_id = bot_atual.id
 
@@ -1818,11 +1818,11 @@ async def start(
         .execute()
     )
 
-if not bot_data.data:
-    await update.message.reply_text(
+    if not bot_data.data:
+        await update.message.reply_text(
             "👋 Este bot ainda não está configurado."
         )
-    return
+        return
 
     client_id = bot_data.data[0]["client_id"]
 
@@ -1840,87 +1840,43 @@ if not bot_data.data:
         .execute()
     )
 
-
-if not bot_data.data:
-    await update.message.reply_text(
-            "👋 Este bot ainda não está configurado."
-        )
-    
-    return
-    
-client_id = bot_data.data[0]["client_id"]
-
-print(
-    f"🔎 START | bot_id={bot_telegram_id} "
-    f"| client_id={client_id}"
-    )
-
-produtos = (
-    supabase.table("products")
-    .select("*")
-    .eq(
-        "client_id",
-            client_id
-        )
-        .eq(
-            "bot_id",
-            bot_telegram_id
-        )
-        .eq(
-            "status",
-            "active"
-        )
-        .execute()
-    )
-
-if not produtos.data:
-
+    if not produtos.data:
         await update.message.reply_text(
             "📋 Nenhuma oferta disponível "
             "no momento."
-        )      
-    
+        )
         return
-    
-primeiro_prod = produtos.data[0]
 
-saudacao = html.escape(
- 
-    primeiro_prod.get("greeting_message")
+    primeiro_prod = produtos.data[0]
+
+    saudacao = html.escape(
+        primeiro_prod.get("greeting_message")
         or "Seja bem-vindo!"
     )
 
-titulo = html.escape(
+    titulo = html.escape(
         primeiro_prod.get("title")
         or "Acesso VIP Exclusivo"
     )
 
-media_id = primeiro_prod.get("media_file_id")
-    
-media_type = primeiro_prod.get("media_type")
+    media_id = primeiro_prod.get("media_file_id")
+    media_type = primeiro_prod.get("media_type")
 
-texto_oferta = (
+    texto_oferta = (
         f"{saudacao}\n\n"
         f"🌟 <b>{titulo}</b>\n\n"
         "👇 Escolha abaixo o plano ideal para você:"
     )
 
-botoes_planos = []
+    botoes_planos = []
 
-for prod in produtos.data:
-
+    for prod in produtos.data:
         tempo = str(
-            prod.get(
-                "duration_type",
-                "mensal"
-            )
+            prod.get("duration_type", "mensal")
         ).capitalize()
 
         preco = float(
-            prod.get(
-                "price",
-                0.0
-            )
+            prod.get("price", 0.0)
         )
 
         botoes_planos.append([
@@ -1929,16 +1885,12 @@ for prod in produtos.data:
                 callback_data=f"plano_{prod['id']}"
             )
         ])
-    
-keyboard = InlineKeyboardMarkup(
+
+    keyboard = InlineKeyboardMarkup(
         botoes_planos
     )
 
-if (
-        media_id
-        and media_type == "photo"
-    ):
-
+    if media_id and media_type == "photo":
         await update.message.reply_photo(
             photo=media_id,
             caption=texto_oferta,
@@ -1946,11 +1898,7 @@ if (
             parse_mode="HTML"
         )
 
-elif (
-        media_id
-        and media_type == "video"
-    ):
-
+    elif media_id and media_type == "video":
         await update.message.reply_video(
             video=media_id,
             caption=texto_oferta,
@@ -1958,13 +1906,13 @@ elif (
             parse_mode="HTML"
         )
 
-else:
-
+    else:
         await update.message.reply_text(
             text=texto_oferta,
-            reply_markup=keyboard,
+            reply_markup=keyboard ,
             parse_mode="HTML"
         )
+
 
 
 # ============================================================
