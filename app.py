@@ -765,105 +765,127 @@ async def receber_nome_bot(
     return AGUARDANDO_TOKEN_BOT
 
 
+
 async def receber_token_bot(
     update: Update,
     context
 ):
+    from telegram.error import (
+        InvalidToken,
+        NetworkError,
+        TimedOut,
+        TelegramError,
+    )
 
     token_inserido = update.message.text.strip()
-    print(f"🔎 TOKEN DIGITADO: {token_inserido[:12]}...")
-    print(f"🔎 BOT PRINCIPAL: {BOT_TOKEN[:12]}...")
+
+    # Não registrar tokens nos logs.
+    if token_inserido == BOT_TOKEN:
+        await update.message.reply_text(
+            "❌ Esse é o token do Botchê principal. "
+            "Envie o token de OUTRO bot criado "
+            "no @BotFather."
+        )
+        return AGUARDANDO_TOKEN_BOT
+
+    temp_bot = Bot(token=token_inserido)
+    inicializado = False
+    bot_info = None
 
     try:
-
-        temp_bot = Bot(
-            token=token_inserido
-        )
-
         await temp_bot.initialize()
+        inicializado = True
 
         bot_info = await temp_bot.get_me()
 
-        await temp_bot.shutdown()
-
-        if token_inserido == BOT_TOKEN:
-
-            await update.message.reply_text(
-                "❌ Esse é o token do Botchê principal. "
-                "Envie o token de OUTRO bot criado "
-                "no @BotFather."
-            )
-
-            return AGUARDANDO_TOKEN_BOT
-
-        bot_existente = (
-            supabase.table("telegram_bots")
-            .select("id, client_id")
-            .eq(
-                "bot_id",
-                bot_info.id
-            )
-            .limit(1)
-            .execute()
-        )
-
-        if bot_existente.data:
-
-            cliente_existente = (
-                bot_existente.data[0]["client_id"]
-            )
-
-            cliente_atual = (
-                obter_ou_criar_cliente(
-                    update.effective_user.id
-                )
-            )
-
-            if cliente_existente != cliente_atual:
-
-                await update.message.reply_text(
-                    "❌ Esse bot já está vinculado "
-                    "a outro cliente.\n\n"
-                    "Envie o token de outro bot "
-                    "criado no @BotFather."
-                )
-
-                return AGUARDANDO_TOKEN_BOT
-
-        context.user_data["bot_id"] = bot_info.id
-
-        context.user_data[
-            "bot_username"
-        ] = bot_info.username
-
-        context.user_data[
-            "bot_token"
-        ] = token_inserido
-
-    except Exception as e:
-
-        print(
-            f"❌ Erro ao validar token: {e}"
-        )
-
+    except InvalidToken:
         await update.message.reply_text(
-            "❌ <b>Token inválido!</b> "
-            "Por favor, verifique o token "
-            "gerado no @BotFather e envie "
-            "novamente:",
-            parse_mode="HTML"
+            "❌ O Telegram rejeitou esse token.\n\n"
+            "Confira o token atual no @BotFather "
+            "e envie novamente."
         )
-
         return AGUARDANDO_TOKEN_BOT
 
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "❌ Cancelar",
-                callback_data="cancelar_onboarding"
+    except (NetworkError, TimedOut) as e:
+        print(
+            "⚠️ FALHA DE REDE NA VALIDAÇÃO: "
+            f"{type(e).__name__}: {e}"
+        )
+        await update.message.reply_text(
+            "⚠️ Não foi possível verificar o token "
+            "por uma falha de conexão com o Telegram.\n\n"
+            "O token não foi confirmado como inválido. "
+            "Aguarde um instante e tente novamente."
+        )
+        return AGUARDANDO_TOKEN_BOT
+
+    except TelegramError as e:
+        print(
+            "❌ ERRO DA API DO TELEGRAM: "
+            f"{type(e).__name__}: {e}"
+        )
+        await update.message.reply_text(
+            "⚠️ O Telegram retornou um erro durante "
+            "a validação.\n\n"
+            "Tente novamente. Se persistir, "
+            "verifique os logs do servidor."
+        )
+        return AGUARDANDO_TOKEN_BOT
+
+    except Exception as e:
+        print(
+            "❌ ERRO INESPERADO NA VALIDAÇÃO: "
+            f"{type(e).__name__}: {e}"
+        )
+        await update.message.reply_text(
+            "⚠️ Ocorreu um erro inesperado ao "
+            "validar o bot.\n\n"
+            "O problema foi registrado nos logs. "
+            "Tente novamente mais tarde."
+        )
+        return AGUARDANDO_TOKEN_BOT
+
+    finally:
+        if inicializado:
+            try:
+                await temp_bot.shutdown()
+            except Exception as e:
+                print(
+                    "⚠️ ERRO AO ENCERRAR BOT TEMPORÁRIO: "
+                    f"{type(e).__name__}: {e}"
+                )
+
+    # Verificar se o bot já está cadastrado.
+    bot_existente = (
+        supabase.table("telegram_bots")
+        .select("id, client_id")
+        .eq("bot_id", bot_info.id)
+        .limit(1)
+        .execute()
+    )
+
+    if bot_existente.data:
+        cliente_existente = (
+            bot_existente.data[0]["client_id"]
+        )
+
+        cliente_atual = obter_ou_criar_cliente(
+            update.effective_user.id
+        )
+
+        if str(cliente_existente) != str(cliente_atual):
+            await update.message.reply_text(
+                "❌ Esse bot já está vinculado "
+                "a outro cliente.\n\n"
+                "Envie o token de outro bot "
+                "criado no @BotFather."
             )
-        ]
-    ])
+            return AGUARDANDO_TOKEN_BOT
+
+    # Guardar os dados para as próximas etapas.
+    context.user_data["bot_id"] = bot_info.id
+    context.user_data["bot_username"] = bot_info.username
+    context.user_data["bot_token"] = token_inserido
 
     username_limpo = html.escape(
         bot_info.username or ""
@@ -883,11 +905,19 @@ async def receber_token_bot(
         "Seja muito bem-vindo! "
         "Escolha um dos planos abaixo "
         "para liberar seu acesso imediato.</code>",
-        reply_markup=keyboard,
+        reply_markup=InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(
+                    "❌ Cancelar",
+                    callback_data="cancelar_onboarding"
+                )
+            ]
+        ]),
         parse_mode="HTML"
     )
 
     return AGUARDANDO_PRODUTO_INFO
+
 
 
 async def receber_produto_info(
