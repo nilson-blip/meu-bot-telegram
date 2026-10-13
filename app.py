@@ -1396,8 +1396,10 @@ async def verificar_grupo_vip_cliente(
             timeout=10
         ).json()
 
-        chat_id = None
+                chat_id = None
         chat_title = None
+
+        telegram_user_id = update.effective_user.id
 
         if response.get("ok"):
 
@@ -1413,13 +1415,9 @@ async def verificar_grupo_vip_cliente(
 
                     if key in result:
 
-                        chat_info = result[
-                            key
-                        ]["chat"]
+                        chat_info = result[key]["chat"]
 
-                        chat_id = str(
-                            chat_info["id"]
-                        )
+                        chat_id = str(chat_info["id"])
 
                         chat_title = chat_info.get(
                             "title",
@@ -1431,12 +1429,10 @@ async def verificar_grupo_vip_cliente(
                 if chat_id:
                     break
 
-                if chat_id:
-                    telegram_user_id = update.effective_user.id
-
-            client_id = obter_ou_criar_cliente(
-                telegram_user_id
-            )
+            if chat_id:
+                client_id = obter_ou_criar_cliente(
+                    telegram_user_id
+                )
 
             res = (
                 supabase.table("vip_groups")
