@@ -1396,7 +1396,7 @@ async def verificar_grupo_vip_cliente(
             timeout=10
         ).json()
 
-                chat_id = None
+        chat_id = None
         chat_title = None
 
         telegram_user_id = update.effective_user.id
