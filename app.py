@@ -1831,8 +1831,13 @@ async def start(
         reply_markup=ReplyKeyboardRemove()
     )
 
-    token_atual = bot_atual.token
-    bot_telegram_id = bot_atual.id
+    # Identifica o bot que recebeu o /start
+    token_atual = context.bot.token
+    bot_telegram_id = context.bot.id
+
+    print(
+        f"🔎 START | bot_id={bot_telegram_id}"
+    )
 
     bot_data = (
         supabase.table("telegram_bots")
@@ -1935,7 +1940,7 @@ async def start(
     else:
         await update.message.reply_text(
             text=texto_oferta,
-            reply_markup=keyboard ,
+            reply_markup=keyboard,
             parse_mode="HTML"
         )
 
