@@ -1676,8 +1676,8 @@ async def concluir_configuracao(
                 ),
                 "status": "active",
             }
-
-
+            
+            
             if vip_group_id:
 
                 prod_payload[
