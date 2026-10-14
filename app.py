@@ -1648,9 +1648,9 @@ async def concluir_configuracao(
             []
         ):
 
-            prod_payload = {
+         prod_payload = {
                 "client_id": client_id,
-                "bot_id": custom_bot_id,
+                "bot_id": custom_bot_id,  # Garante o vínculo exato com o bot do cliente
                 "title": dados.get(
                     "produto_nome",
                     "Produto VIP"
@@ -1676,6 +1676,7 @@ async def concluir_configuracao(
                 ),
                 "status": "active",
             }
+
 
             if vip_group_id:
 
