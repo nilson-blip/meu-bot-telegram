@@ -1678,11 +1678,10 @@ async def concluir_configuracao(
             }
             
             
-            if vip_group_id:
-
-                prod_payload[
-                    "vip_group_id"
-                ] = vip_group_id
+         if vip_group_id:
+             prod_payload[
+             "vip_group_id"
+             ] = vip_group_id
 
             (
                 supabase.table("products")
