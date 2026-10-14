@@ -1831,9 +1831,9 @@ async def start(
         reply_markup=ReplyKeyboardRemove()
     )
 
-    # Identifica o bot que recebeu o /start
-    token_atual = context.bot.token
-    bot_telegram_id = context.bot.id
+    bot_atual = obter_bot_do_update(update)
+    token_atual = bot_atual.token
+    bot_telegram_id = bot_atual.id
 
     print(
         f"🔎 START | bot_id={bot_telegram_id}"
@@ -1843,7 +1843,6 @@ async def start(
         supabase.table("telegram_bots")
         .select("id, client_id, bot_id, bot_token")
         .eq("bot_id", bot_telegram_id)
-        .eq("bot_token", token_atual)
         .eq("status", "active")
         .limit(1)
         .execute()
@@ -1856,11 +1855,6 @@ async def start(
         return
 
     client_id = bot_data.data[0]["client_id"]
-
-    print(
-        f"🔎 START | bot_id={bot_telegram_id} "
-        f"| client_id={client_id}"
-    )
 
     produtos = (
         supabase.table("products")
@@ -1943,6 +1937,7 @@ async def start(
             reply_markup=keyboard,
             parse_mode="HTML"
         )
+
 
 
 
