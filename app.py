@@ -1682,8 +1682,8 @@ async def concluir_configuracao(
              prod_payload[
              "vip_group_id"
              ] = vip_group_id
-
-            (
+             
+             (
                 supabase.table("products")
                 .insert(prod_payload)
                 .execute()
