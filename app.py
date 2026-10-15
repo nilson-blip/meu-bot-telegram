@@ -1469,7 +1469,6 @@ async def verificar_grupo_vip_cliente(
 
 
     except Exception as e:
-
         print(
             f"Erro ao verificar bot do cliente: {e}"
         )
