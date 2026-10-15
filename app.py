@@ -1462,7 +1462,7 @@ async def verificar_grupo_vip_cliente(
                 reply_markup=keyboard,
                 parse_mode="HTML"
             )
-            context.user_data.clear()
+        context.user_data.clear()
             return ConversationHandler.END
 
         # Caso o chat_id não seja encontrado dentro do try
