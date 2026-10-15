@@ -1458,13 +1458,16 @@ async def verificar_grupo_vip_cliente(
                 context.user_data[
                     "vip_group_id"
                 ] = res.data[0]["id"]
-
-            await query.message.reply_text(
-                f"✅ <b>Canal detetado com sucesso!</b>\n\n"
-                f"📢 <b>Canal:</b> "
-                f"{html.escape(chat_title)}",
-                parse_mode="HTML"
-            )
+                
+        await query.message.reply_text(
+            "✅ <b>Grupo/Canal VIP vinculado com sucesso e bot ativado!</b>\n\n"
+            f"📢 <b>Grupo:</b> {html.escape(chat_title)}\n\n"
+            f"✨ O seu bot <b>@{html.escape(custom_bot_username)}</b> já está online e pronto a funcionar!\n\n"
+            "👉 <b>Basta abrir o seu bot e digitar /configurar para cadastrar os seus produtos e planos.</b>",
+            parse_mode="HTML"
+        )
+        context.user_data.clear()
+        return ConversationHandler.END
 
             return await exibir_revisao_final(
                 query.message,
