@@ -3904,7 +3904,7 @@ async def cli_receber_midia(update: Update, context):
     return ConversationHandler.END
 
 # Registo do handler de configuração do cliente
-conv_handler_cliente = ConversationHandler(
+    conv_handler_cliente = ConversationHandler(
     entry_points=[CommandHandler("configurar", cli_iniciar_configuracao)],
     states={
         CLI_AGUARDANDO_TITULO_PRODUTO: [
