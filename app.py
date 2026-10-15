@@ -2591,16 +2591,13 @@ async def botoes(
 async def lifespan(app: FastAPI):
 
     onboarding_handler = ConversationHandler(
-
         entry_points=[
             CommandHandler(
                 "configurar",
                 iniciar_configuracao
             )
         ],
-
         states={
-
             AGUARDANDO_NOME_BOT: [
                 CallbackQueryHandler(
                     passo1_nome_bot,
@@ -2612,7 +2609,6 @@ async def lifespan(app: FastAPI):
                     receber_nome_bot
                 ),
             ],
-
             AGUARDANDO_TOKEN_BOT: [
                 MessageHandler(
                     filters.TEXT &
@@ -2620,70 +2616,13 @@ async def lifespan(app: FastAPI):
                     receber_token_bot
                 ),
             ],
-
-            AGUARDANDO_PRODUTO_INFO: [
-                MessageHandler(
-                    filters.TEXT &
-                    ~filters.COMMAND,
-                    receber_produto_info
-                ),
-            ],
-
-            AGUARDANDO_SELECAO_PLANO: [
-                CallbackQueryHandler(
-                    receber_selecao_plano,
-                    pattern="^add_"
-                ),
-            ],
-
-            AGUARDANDO_VALOR_PLANO: [
-                MessageHandler(
-                    filters.TEXT &
-                    ~filters.COMMAND,
-                    receber_valor_plano
-                ),
-            ],
-
-            AGUARDANDO_DECISAO_MAIS_PLANOS: [
-                CallbackQueryHandler(
-                    decisao_mais_planos,
-                    pattern=(
-                        "^(add_mais_planos|"
-                        "avancar_midia)$"
-                    ),
-                ),
-            ],
-
-            AGUARDANDO_MIDIA: [
-                CallbackQueryHandler(
-                    receber_midia,
-                    pattern=(
-                        "^(pular_midia|"
-                        "avancar_grupo_vip)$"
-                    ),
-                ),
-                MessageHandler(
-                    filters.PHOTO |
-                    filters.VIDEO,
-                    receber_midia
-                ),
-            ],
-
             AGUARDANDO_GRUPO_VIP: [
                 CallbackQueryHandler(
                     verificar_grupo_vip_cliente,
                     pattern="^verificar_bot_cliente$"
                 ),
             ],
-
-            AGUARDANDO_REVISAO: [
-                CallbackQueryHandler(
-                    concluir_configuracao,
-                    pattern="^concluir_onboarding$"
-                ),
-            ],
         },
-
         fallbacks=[
             CommandHandler(
                 "cancelar",
@@ -2700,10 +2639,27 @@ async def lifespan(app: FastAPI):
         ],
     )
 
-    telegram_app.add_handler(
-        onboarding_handler
+    conv_handler_cliente = ConversationHandler(
+        entry_points=[CommandHandler("configurar", cli_iniciar_configuracao)],
+        states={
+            CLI_AGUARDANDO_TITULO_PRODUTO: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, cli_receber_titulo)
+            ],
+            CLI_AGUARDANDO_VALOR_PLANO: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, cli_receber_valor)
+            ],
+            CLI_AGUARDANDO_DURACAO: [
+                CallbackQueryHandler(cli_receber_duracao, pattern="^dur_")
+            ],
+            CLI_AGUARDANDO_MIDIA: [
+                MessageHandler(filters.PHOTO, cli_receber_midia)
+            ],
+        },
+        fallbacks=[CommandHandler("cancelar", lambda u, c: ConversationHandler.END)],
     )
 
+    telegram_app.add_handler(onboarding_handler)
+    telegram_app.add_handler(conv_handler_cliente)
     telegram_app.add_handler(
         CommandHandler(
             "start",
