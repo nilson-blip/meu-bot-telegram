@@ -1388,11 +1388,10 @@ async def verificar_grupo_vip_cliente(
         "Verificando o seu bot no canal..."
     )
 
-    bot_token_cliente = context.user_data.get(
-        "bot_token"   
+    bot_token_cliente = context.user_data.get("bot_token")
     bot_username = context.user_data.get("bot_username", "seu bot")
 
-    )
+    
 
     if not bot_token_cliente:
 
