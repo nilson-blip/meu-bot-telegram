@@ -1454,30 +1454,60 @@ async def verificar_grupo_vip_cliente(
     except Exception as e:
         print(f"Erro ao configurar webhook/grupo do cliente: {e}")
 
-    await query.message.reply_text(
-        "⚠️ <b>Ainda não conseguimos detetar o seu bot no canal.</b>\n\n"
-        "Certifique-se de que adicionou o bot como Administrador e enviou uma mensagem.\n"
-        "Depois clique em <b>Tentar Novamente</b>.",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔄 Tentar Novamente", callback_data="verificar_bot_cliente")],
-            [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
-        ]),
-        parse_mode="HTML"
-    )
+            await query.message.reply_text(
+                "✅ <b>Grupo/Canal VIP vinculado com sucesso!</b>\n\n"
+                f"📢 <b>Grupo:</b> {html.escape(chat_title)}\n\n"
+                f"✨ O seu bot <b>@{html.escape(bot_username)}</b> está pronto!\n\n"
+                "👉 Clique no botão abaixo para abrir o seu bot e cadastrar os seus produtos e valores:",
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+            context.user_data.clear()
+            return ConversationHandler.END
 
-    return AGUARDANDO_GRUPO_VIP
+        # Caso o chat_id não seja encontrado dentro do try
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(
+                    "🔄 Tentar Novamente",
+                    callback_data="verificar_bot_cliente"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "❌ Cancelar",
+                    callback_data="cancelar_onboarding"
+                )
+            ]
+        ])
 
+        await query.message.reply_text(
+            "⚠️ <b>Ainda não conseguimos "
+            "detetar o seu bot no canal.</b>\n\n"
+            "Certifique-se de que adicionou "
+            "o bot como Administrador e "
+            "enviou uma mensagem.\n"
+            "Depois clique em "
+            "<b>Tentar Novamente</b>.",
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
 
-except Exception as e:
+        return AGUARDANDO_GRUPO_VIP
+
+    except Exception as e:
+
         print(
             f"Erro ao verificar bot do cliente: {e}"
         )
-await query.message.reply_text(
+
+        await query.message.reply_text(
             "❌ Ocorreu um erro ao verificar "
             "o bot. Tente novamente."
         )
 
-    return AGUARDANDO_GRUPO_VIP
+        return AGUARDANDO_GRUPO_VIP
+
 
 
 async def exibir_revisao_final(
