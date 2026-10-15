@@ -1468,17 +1468,17 @@ async def verificar_grupo_vip_cliente(
     return AGUARDANDO_GRUPO_VIP
 
 
-except Exception as e:
+    except Exception as e:
         print(
             f"Erro ao verificar bot do cliente: {e}"
         )
 
-        await query.message.reply_text(
+    await query.message.reply_text(
             "❌ Ocorreu um erro ao verificar "
             "o bot. Tente novamente."
         )
 
-        return AGUARDANDO_GRUPO_VIP
+    return AGUARDANDO_GRUPO_VIP
 
 
 async def exibir_revisao_final(
