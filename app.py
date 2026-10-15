@@ -1419,7 +1419,7 @@ async def verificar_grupo_vip_cliente(
             for result in reversed(response.get("result", [])):
                 # Tenta apanhar o chat de diferentes tipos de eventos do Telegram
                 chat_info = None
-         if "my_chat_member" in result:
+                if "my_chat_member" in result:
                     chat_info = result["my_chat_member"]["chat"]
                 elif "message" in result:
                     chat_info = result["message"]["chat"]
@@ -1428,7 +1428,7 @@ async def verificar_grupo_vip_cliente(
                 elif "edited_message" in result:
                     chat_info = result["edited_message"]["chat"]
 
-         if chat_info:
+                 if chat_info:
                     # Filtramos para garantir que é um Grupo, Supergrupo ou Canal (ignorando chat privado com o bot)
                     if chat_info.get("type") in ["group", "supergroup", "channel"]:
                         chat_id = str(chat_info["id"])
