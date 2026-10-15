@@ -3922,6 +3922,6 @@ async def cli_receber_midia(update: Update, context):
     },
     fallbacks=[CommandHandler("cancelar", lambda u, c: ConversationHandler.END)],
 )
-
-application.add_handler(conv_handler_cliente)
+    
+    application.add_handler(conv_handler_cliente)
 
