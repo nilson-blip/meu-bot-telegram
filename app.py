@@ -2641,6 +2641,7 @@ async def lifespan(app: FastAPI):
 
     conv_handler_cliente = ConversationHandler(
         entry_points=[CommandHandler("configurar", cli_iniciar_configuracao)],
+       
         states={
             CLI_AGUARDANDO_TITULO_PRODUTO: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, cli_receber_titulo)
