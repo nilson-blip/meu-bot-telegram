@@ -1416,37 +1416,27 @@ async def verificar_grupo_vip_cliente(
         telegram_user_id = update.effective_user.id
 
         if response.get("ok"):
+            for result in reversed(response.get("result", [])):
+                # Tenta apanhar o chat de diferentes tipos de eventos do Telegram
+                chat_info = None
+         if "my_chat_member" in result:
+                    chat_info = result["my_chat_member"]["chat"]
+                elif "message" in result:
+                    chat_info = result["message"]["chat"]
+                elif "channel_post" in result:
+                    chat_info = result["channel_post"]["chat"]
+                elif "edited_message" in result:
+                    chat_info = result["edited_message"]["chat"]
 
-            for result in reversed(
-                response.get("result", [])
-            ):
-
-                for key in [
-                    "my_chat_member",
-                    "channel_post",
-                    "message"
-                ]:
-
-                    if key in result:
-
-                        chat_info = result[key]["chat"]
-
+         if chat_info:
+                    # Filtramos para garantir que é um Grupo, Supergrupo ou Canal (ignorando chat privado com o bot)
+                    if chat_info.get("type") in ["group", "supergroup", "channel"]:
                         chat_id = str(chat_info["id"])
-
-                        chat_title = chat_info.get(
-                            "title",
-                            "Canal VIP"
-                        )
-
+                        chat_title = chat_info.get("title", "Canal/Grupo VIP")
                         break
 
-                if chat_id:
-                    break
-
-            if chat_id:
-                client_id = obter_ou_criar_cliente(
-                    telegram_user_id
-                )
+        if chat_id:
+            client_id = obter_ou_criar_cliente(telegram_user_id)
 
             res = (
                 supabase.table("vip_groups")
@@ -1454,28 +1444,24 @@ async def verificar_grupo_vip_cliente(
                     "client_id": client_id,
                     "chat_id": chat_id,
                     "title": chat_title,
-                    "created_at": datetime.now(
-                        timezone.utc
-                    ).isoformat()
+                    "created_at": datetime.now(timezone.utc).isoformat()
                 })
                 .execute()
             )
 
             if res.data:
+                context.user_data["vip_group_id"] = res.data[0]["id"]
 
-                context.user_data[
-                    "vip_group_id"
-                ] = res.data[0]["id"]
-                
-        await query.message.reply_text(
-            "✅ <b>Grupo/Canal VIP vinculado com sucesso e bot ativado!</b>\n\n"
-            f"📢 <b>Grupo:</b> {html.escape(chat_title)}\n\n"
-            f"✨ O seu bot <b>@{html.escape(custom_bot_username)}</b> já está online e pronto a funcionar!\n\n"
-            "👉 <b>Basta abrir o seu bot e digitar /configurar para cadastrar os seus produtos e planos.</b>",
-            parse_mode="HTML"
-        )
-        context.user_data.clear()
-        return ConversationHandler.END
+            await query.message.reply_text(
+                "✅ <b>Grupo/Canal VIP vinculado com sucesso e bot ativado!</b>\n\n"
+                f"📢 <b>Grupo:</b> {html.escape(chat_title)}\n\n"
+                f"✨ O seu bot <b>@{html.escape(bot_username)}</b> já está online e pronto a funcionar!\n\n"
+                "👉 <b>Basta abrir o seu bot e digitar /configurar para cadastrar os seus produtos e planos.</b>",
+                parse_mode="HTML"
+            )
+            context.user_data.clear()
+            return ConversationHandler.END
+
 
         return await exibir_revisao_final(
                 query.message,
