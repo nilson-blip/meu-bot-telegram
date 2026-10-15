@@ -104,6 +104,12 @@ telegram_app: Application = (
     AGUARDANDO_REVISAO,
 ) = range(9)
 
+CLI_AGUARDANDO_TITULO_PRODUTO = 101
+CLI_AGUARDANDO_VALOR_PLANO = 102
+CLI_AGUARDANDO_DURACAO = 103
+CLI_AGUARDANDO_MIDIA = 104
+
+
 
 # ============================================================
 # FUNÇÕES AUXILIARES
