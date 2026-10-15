@@ -1439,7 +1439,7 @@ async def verificar_grupo_vip_cliente(
                     )
                 ]
             ])
-
+            
             await query.message.reply_text(
                 "✅ <b>Grupo/Canal VIP vinculado com sucesso!</b>\n\n"
                 f"📢 <b>Grupo:</b> {html.escape(chat_title)}\n\n"
@@ -1453,8 +1453,8 @@ async def verificar_grupo_vip_cliente(
     
     except Exception as e:
         print(f"Erro ao configurar webhook/grupo do cliente: {e}")
-
-            await query.message.reply_text(
+        
+        await query.message.reply_text(
                 "✅ <b>Grupo/Canal VIP vinculado com sucesso!</b>\n\n"
                 f"📢 <b>Grupo:</b> {html.escape(chat_title)}\n\n"
                 f"✨ O seu bot <b>@{html.escape(bot_username)}</b> está pronto!\n\n"
