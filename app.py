@@ -3765,4 +3765,163 @@ async def mercadopago_webhook(
         return PlainTextResponse(
             "Erro",
             status_code=500
-        )
+        ) 
+    async def cli_iniciar_configuracao(update: Update, context):
+    bot_token_atual = context.bot.token
+    
+    res = (
+        supabase.table("telegram_bots")
+        .select("id, client_id, bot_id")
+        .eq("bot_token", bot_token_atual)
+        .limit(1)
+        .execute()
+    )
+    
+    if not res.data:
+        await update.message.reply_text("❌ Este bot não está registado na plataforma.")
+        return ConversationHandler.END
+        
+    bot_data = res.data[0]
+    context.user_data["config_client_id"] = bot_data["client_id"]
+    context.user_data["config_bot_id"] = bot_data["bot_id"]
+    
+    res_grupo = (
+        supabase.table("vip_groups")
+        .select("id, title")
+        .eq("client_id", bot_data["client_id"])
+        .limit(1)
+        .execute()
+    )
+    
+    if not res_grupo.data:
+        await update.message.reply_text("❌ Nenhum Grupo VIP encontrado para este bot.")
+        return ConversationHandler.END
+        
+    context.user_data["config_vip_group_id"] = res_grupo.data[0]["id"]
+    
+    await update.message.reply_text(
+        "🛠️ **Painel de Configuração do seu Bot**\n\n"
+        "Vamos cadastrar o seu primeiro plano/produto de vendas.\n\n"
+        "📝 Envie o **Título/Nome do Produto** (Ex: *VIP Mensal - Acesso Completo*):",
+        parse_mode="Markdown"
+    )
+    return CLI_AGUARDANDO_TITULO_PRODUTO
+
+async def cli_receber_titulo(update: Update, context):
+    context.user_data["config_titulo"] = update.message.text.strip()
+    
+    await update.message.reply_text(
+        "💰 Agora, digite o **valor em Reais** deste plano (Ex: `29.90` ou `97.00`):",
+        parse_mode="Markdown"
+    )
+    return CLI_AGUARDANDO_VALOR_PLANO
+
+async def cli_receber_valor(update: Update, context):
+    texto_valor = update.message.text.strip().replace(",", ".")
+    try:
+        valor = float(texto_valor)
+        if valor <= 0:
+            raise ValueError()
+    except ValueError:
+        await update.message.reply_text("❌ Valor inválido. Envie apenas números (Ex: `19.90`):")
+        return CLI_AGUARDANDO_VALOR_PLANO
+        
+    context.user_data["config_preco"] = valor
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("Semanal (7 dias)", callback_data="dur_semanal")],
+        [InlineKeyboardButton("Quinzenal (15 dias)", callback_data="dur_quinzenal")],
+        [InlineKeyboardButton("Mensal (30 dias)", callback_data="dur_mensal")],
+        [InlineKeyboardButton("Vitalício (36500 dias)", callback_data="dur_vitalicio")]
+    ])
+    
+    await update.message.reply_text(
+        "⏱️ Selecione a **duração/tipo** deste plano:",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    return CLI_AGUARDANDO_DURACAO
+
+async def cli_receber_duracao(update: Update, context):
+    query = update.callback_query
+    await query.answer()
+    
+    escolha = query.data
+    if escolha == "dur_semanal":
+        duration_type, days = "semanal", 7
+    elif escolha == "dur_quinzenal":
+        duration_type, days = "quinzenal", 15
+    elif escolha == "dur_mensal":
+        duration_type, days = "mensal", 30
+    else:
+        duration_type, days = "vitalicio", 36500
+        
+    context.user_data["config_duration_type"] = duration_type
+    context.user_data["config_days"] = days
+    
+    await query.message.reply_text(
+        "📸 Envie agora a **foto (imagem)** de divulgação que aparecerá para os clientes quando eles abrirem o seu bot:",
+        parse_mode="Markdown"
+    )
+    return CLI_AGUARDANDO_MIDIA
+
+async def cli_receber_midia(update: Update, context):
+    if not update.message.photo:
+        await update.message.reply_text("❌ Por favor, envie uma **foto** válida para continuar:")
+        return CLI_AGUARDANDO_MIDIA
+        
+    photo = update.message.photo[-1]
+    media_file_id = photo.file_id
+    
+    client_id = context.user_data.get("config_client_id")
+    vip_group_id = context.user_data.get("config_vip_group_id")
+    title = context.user_data.get("config_titulo")
+    duration_type = context.user_data.get("config_duration_type")
+    duration_days = context.user_data.get("config_days")
+    price = context.user_data.get("config_preco")
+    bot_id = context.user_data.get("config_bot_id")
+    
+    supabase.table("products").insert({
+        "client_id": client_id,
+        "vip_group_id": vip_group_id,
+        "title": title,
+        "duration_type": duration_type,
+        "duration_days": duration_days,
+        "price": price,
+        "status": "active",
+        "greeting_message": "Seja muito bem-vindo! Escolha o plano ideal para você:",
+        "media_file_id": media_file_id,
+        "media_type": "photo",
+        "bot_id": str(bot_id)
+    }).execute()
+    
+    await update.message.reply_text(
+        "✅ **Produto e plano cadastrados com sucesso!**\n\n"
+        "O seu bot já está configurado e pronto a vender. Os clientes já podem interagir com ele e comprar o acesso ao seu grupo VIP!",
+        parse_mode="Markdown"
+    )
+    context.user_data.clear()
+    return ConversationHandler.END
+
+# Registo do handler de configuração do cliente
+conv_handler_cliente = ConversationHandler(
+    entry_points=[CommandHandler("configurar", cli_iniciar_configuracao)],
+    states={
+        CLI_AGUARDANDO_TITULO_PRODUTO: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, cli_receber_titulo)
+        ],
+        CLI_AGUARDANDO_VALOR_PLANO: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, cli_receber_valor)
+        ],
+        CLI_AGUARDANDO_DURACAO: [
+            CallbackQueryHandler(cli_receber_duracao, pattern="^dur_")
+        ],
+        CLI_AGUARDANDO_MIDIA: [
+            MessageHandler(filters.PHOTO, cli_receber_midia)
+        ],
+    },
+    fallbacks=[CommandHandler("cancelar", lambda u, c: ConversationHandler.END)],
+)
+
+application.add_handler(conv_handler_cliente)
+
