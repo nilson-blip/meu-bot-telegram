@@ -1819,9 +1819,7 @@ async def concluir_configuracao(
 
 # ============================================================
 # /START
-# ============================================================
-
-
+# ================≈===========================================
 
 async def start(
     update: Update,
@@ -1831,6 +1829,7 @@ async def start(
     token_atual = bot_atual.token
     bot_telegram_id = bot_atual.id
 
+    # Se for o Bot Mestre, inicia diretamente o fluxo de configuração do SaaS
     if token_atual == BOT_TOKEN:
         context.user_data["planos"] = []
         keyboard = InlineKeyboardMarkup([
@@ -1851,8 +1850,9 @@ async def start(
         )
         return AGUARDANDO_NOME_BOT
 
+    # Se for o bot de um cliente, executa a listagem normal de produtos de venda
     await update.message.reply_text(
-        "⏳ Carregando planos...",
+        "⏳ A carregar planos...",
         reply_markup=ReplyKeyboardRemove()
     )
 
@@ -1961,6 +1961,7 @@ async def start(
             reply_markup=keyboard,
             parse_mode="HTML"
         )
+
 
 
 
