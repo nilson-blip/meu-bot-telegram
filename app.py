@@ -1469,7 +1469,7 @@ async def verificar_grupo_vip_cliente(
         context.user_data.clear()
         return ConversationHandler.END
 
-            return await exibir_revisao_final(
+        return await exibir_revisao_final(
                 query.message,
                 context
             )
