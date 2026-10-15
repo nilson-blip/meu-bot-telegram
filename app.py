@@ -1450,7 +1450,7 @@ async def verificar_grupo_vip_cliente(
             )
             context.user_data.clear()
             return ConversationHandler.END
-
+    
     except Exception as e:
         print(f"Erro ao configurar webhook/grupo do cliente: {e}")
 
@@ -1468,12 +1468,11 @@ async def verificar_grupo_vip_cliente(
     return AGUARDANDO_GRUPO_VIP
 
 
-    except Exception as e:
+except Exception as e:
         print(
             f"Erro ao verificar bot do cliente: {e}"
         )
-
-    await query.message.reply_text(
+await query.message.reply_text(
             "❌ Ocorreu um erro ao verificar "
             "o bot. Tente novamente."
         )
