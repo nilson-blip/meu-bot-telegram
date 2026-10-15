@@ -1857,7 +1857,11 @@ async def start(
             "👉 /configurar",
             parse_mode="HTML"
         )
-        return
+        return     
+        
+    if context.args and context.args[0] == "configurar":
+        return await cli_iniciar_configuracao(update, context)
+
 
     await update.message.reply_text(
         "⏳ Carregando planos...",
