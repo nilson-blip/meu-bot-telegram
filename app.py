@@ -1435,7 +1435,6 @@ async def verificar_grupo_vip_cliente(
                         chat_id = str(chat_info["id"])
                         chat_title = chat_info.get("title", "Canal/Grupo VIP")
                         break
-
         if chat_id:
             client_id = obter_ou_criar_cliente(telegram_user_id)
 
@@ -1453,15 +1452,31 @@ async def verificar_grupo_vip_cliente(
             if res.data:
                 context.user_data["vip_group_id"] = res.data[0]["id"]
 
+            # Criamos o link direto para iniciar a configuração automaticamente
+            link_bot_cliente = f"https://t.me/{bot_username}?start=configurar"
+
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton(
+                        "⚙️ Configurar Meu Bot Agora",
+                        url=link_bot_cliente
+                    )
+                ]
+            ])
+
             await query.message.reply_text(
-                "✅ <b>Grupo/Canal VIP vinculado com sucesso e bot ativado!</b>\n\n"
+                "✅ <b>Grupo/Canal VIP vinculado com sucesso!</b>\n\n"
                 f"📢 <b>Grupo:</b> {html.escape(chat_title)}\n\n"
-                f"✨ O seu bot <b>@{html.escape(bot_username)}</b> já está online e pronto a funcionar!\n\n"
-                "👉 <b>Basta abrir o seu bot e digitar /configurar para cadastrar os seus produtos e planos.</b>",
+                f"✨ O seu bot <b>@{html.escape(bot_username)}</b> está pronto!\n\n"
+                "👉 Clique no botão abaixo para abrir o seu bot e cadastrar os seus produtos e valores:",
+                reply_markup=keyboard,
                 parse_mode="HTML"
             )
             context.user_data.clear()
             return ConversationHandler.END
+
+
+        
 
 
         return await exibir_revisao_final(
