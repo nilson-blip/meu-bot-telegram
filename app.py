@@ -897,32 +897,44 @@ async def receber_token_bot(
         bot_info.username or ""
     )
 
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "🔍 Já adicionei o meu bot como Admin",
+                callback_data="verificar_bot_cliente"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "❌ Cancelar",
+                callback_data="cancelar_onboarding"
+            )
+        ]
+    ])
+
     await update.message.reply_text(
         f"✅ Bot <b>@{username_limpo}</b> "
         "validado com sucesso!\n\n"
-        "📝 <b>Passo 3 de 6: "
-        "Apresentação do Produto</b>\n\n"
-        "Digite o <b>Nome do seu Produto</b> "
-        "e uma <b>Mensagem de Boas-Vindas</b> "
-        "para o seu cliente.\n\n"
-        "💡 <i>Você pode separar usando "
-        "hífen (-), por exemplo:</i>\n"
-        "<code>Comunidade VIP - "
-        "Seja muito bem-vindo! "
-        "Escolha um dos planos abaixo "
-        "para liberar seu acesso imediato.</code>",
-        reply_markup=InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton(
-                    "❌ Cancelar",
-                    callback_data="cancelar_onboarding"
-                )
-            ]
-        ]),
+        "📢 <b>Passo 3 de 3: "
+        "Vincular Canal/Grupo VIP</b>\n\n"
+        "Agora precisamos de conectar "
+        "o <b>seu bot</b> ao seu Canal "
+        "ou Grupo VIP:\n\n"
+        "1. Abra o seu <b>Canal/Grupo VIP</b> "
+        "no Telegram.\n"
+        "2. Adicione o <b>seu bot</b> como "
+        "<b>Administrador</b>.\n"
+        "3. Garanta que ele tem permissão "
+        "para <i>Convidar Usuários via Link</i>.\n"
+        "4. Envie uma mensagem qualquer "
+        "no canal para ativar a conexão.\n\n"
+        "Quando concluir, clique no botão abaixo:",
+        reply_markup=keyboard,
         parse_mode="HTML"
     )
 
-    return AGUARDANDO_PRODUTO_INFO
+    return AGUARDANDO_GRUPO_VIP
+
 
 
 
