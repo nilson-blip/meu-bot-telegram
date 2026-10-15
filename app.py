@@ -1822,14 +1822,19 @@ async def concluir_configuracao(
 # ============================================================
 
 
-async def start(
-    update: Update,
-    context
-):
+async def start(update: Update, context):
+    bot_atual = obter_bot_do_update(update)
+    
+    # Se for o Bot Principal (Bot Mestre), vai direto para a configuração!
+    if bot_atual.token == BOT_TOKEN:
+        return await iniciar_configuracao(update, context)
+
+    # Se for o bot de um cliente, mantém a exibição normal dos produtos de venda
     await update.message.reply_text(
         "⏳ Carregando planos...",
         reply_markup=ReplyKeyboardRemove()
     )
+
 
     bot_atual = obter_bot_do_update(update)
     token_atual = bot_atual.token
@@ -1913,30 +1918,37 @@ async def start(
 
     keyboard = InlineKeyboardMarkup(
         botoes_planos
-    )
-
-    if media_id and media_type == "photo":
-        await update.message.reply_photo(
-            photo=media_id,
-            caption=texto_oferta,
-            reply_markup=keyboard,
-            parse_mode="HTML"
-        )
-
-    elif media_id and media_type == "video":
-        await update.message.reply_video(
-            video=media_id,
-            caption=texto_oferta,
-            reply_markup=keyboard,
-            parse_mode="HTML"
-        )
-
-    else:
+    )    
+    
+    try:
+        if media_id and media_type == "photo":
+            await update.message.reply_photo(
+                photo=media_id,
+                caption=texto_oferta,
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+        elif media_id and media_type == "video":
+            await update.message.reply_video(
+                video=media_id,
+                caption=texto_oferta,
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+        else:
+            await update.message.reply_text(
+                text=texto_oferta,
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+    except Exception as e:
+        print(f"⚠️ Erro ao enviar mídia, enviando apenas texto: {e}")
         await update.message.reply_text(
             text=texto_oferta,
             reply_markup=keyboard,
             parse_mode="HTML"
         )
+
 
 
 
