@@ -1822,26 +1822,42 @@ async def concluir_configuracao(
 # ============================================================
 
 
-async def start(update: Update, context):
-    bot_atual = obter_bot_do_update(update)
-    
-    # Se for o Bot Principal (Bot Mestre), vai direto para a configuração!
-    if bot_atual.token == BOT_TOKEN:
-        return await iniciar_configuracao(update, context)
-
-    # Se for o bot de um cliente, mantém a exibição normal dos produtos de venda
-    await update.message.reply_text(
-        "⏳ Carregando planos...",
-        reply_markup=ReplyKeyboardRemove()
-    )
-
-
+async def start(
+    update: Update,
+    context
+):
     bot_atual = obter_bot_do_update(update)
     token_atual = bot_atual.token
     bot_telegram_id = bot_atual.id
 
-    print(
-        f"🔎 START | bot_id={bot_telegram_id}"
+    if token_atual == BOT_TOKEN:
+        context.user_data["planos"] = []
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(
+                    "🚀 Iniciar Configuração",
+                    callback_data="iniciar_onboarding"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "❌ Cancelar",
+                    callback_data="cancelar_onboarding"
+                )
+            ]
+        ])
+        await update.message.reply_text(
+            "👋 <b>Seja muito bem-vindo ao assistente de vendas!</b>\n\n"
+            "Vou ajudar-te a configurar o teu bot em poucos passos para automatizares as vendas do teu canal VIP.\n\n"
+            "Vamos começar? Clica no botão abaixo:",
+            reply_markup=keyboard,
+            parse_mode="HTML",
+        )
+        return
+
+    await update.message.reply_text(
+        "⏳ Carregando planos...",
+        reply_markup=ReplyKeyboardRemove()
     )
 
     bot_data = (
@@ -1872,8 +1888,7 @@ async def start(update: Update, context):
 
     if not produtos.data:
         await update.message.reply_text(
-            "📋 Nenhuma oferta disponível "
-            "no momento."
+            "📋 Nenhuma oferta disponível no momento."
         )
         return
 
@@ -1918,8 +1933,8 @@ async def start(update: Update, context):
 
     keyboard = InlineKeyboardMarkup(
         botoes_planos
-    )    
-    
+    )
+
     try:
         if media_id and media_type == "photo":
             await update.message.reply_photo(
@@ -1928,6 +1943,7 @@ async def start(update: Update, context):
                 reply_markup=keyboard,
                 parse_mode="HTML"
             )
+
         elif media_id and media_type == "video":
             await update.message.reply_video(
                 video=media_id,
@@ -1935,6 +1951,7 @@ async def start(update: Update, context):
                 reply_markup=keyboard,
                 parse_mode="HTML"
             )
+
         else:
             await update.message.reply_text(
                 text=texto_oferta,
@@ -1942,12 +1959,13 @@ async def start(update: Update, context):
                 parse_mode="HTML"
             )
     except Exception as e:
-        print(f"⚠️ Erro ao enviar mídia, enviando apenas texto: {e}")
+        print(f"⚠️ Erro ao enviar mídia: {e}")
         await update.message.reply_text(
             text=texto_oferta,
             reply_markup=keyboard,
             parse_mode="HTML"
         )
+
 
 
 
