@@ -1401,18 +1401,14 @@ async def verificar_grupo_vip_cliente(
         )
 
         return AGUARDANDO_GRUPO_VIP
-
+        
     try:
+        
+        url = f"https://api.telegram.org/bot{bot_token_cliente}/getUpdates"
+        response_json = requests.get(url, timeout=10).json()
+        print("🔍 RESPOSTA GETUPDATES DO TELEGRAM:", response_json)
+        response = response_json
 
-        url = (
-            "https://api.telegram.org/bot"
-            f"{bot_token_cliente}/getUpdates"
-        )
-
-        response = requests.get(
-            url,
-            timeout=10
-        ).json()
 
         chat_id = None
         chat_title = None
