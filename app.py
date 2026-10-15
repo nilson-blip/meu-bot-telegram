@@ -2324,30 +2324,35 @@ async def criar_checkout_marketplace(
 # COMPRA - PIX / CARTÃO (COM TOKEN DO CLIENTE ISOLADO)
 # ============================================================
 
+
 async def botoes(
     update: Update,
     context
 ):
-
     query = update.callback_query
-
     await query.answer()
+
+    # TRATAMENTO DIRETO PARA O BOTÃO INICIAL DO ONBOARDING
+    if query.data == "iniciar_onboarding":
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(
+                    "❌ Cancelar",
+                    callback_data="cancelar_onboarding"
+                )
+            ]
+        ])
+        await query.message.reply_text(
+            "🏷 <b>Passo 1 de 6: Nome do seu Bot</b>\n\n"
+            "Como você gostaria de chamar o seu bot de vendas?\n"
+            "<i>(Exemplo: VIP Premium Bot, Canal de Sinais Bot)</i>",
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+        return AGUARDANDO_NOME_BOT
 
     bot_atual = obter_bot_do_update(update)
     token_atual = bot_atual.token
-
-    print(
-        "🔎 CALLBACK RECEBIDO | "
-        f"bot_token={token_atual[:12]}..."
-    )
-
-    if query.data == "finalizar_tudo":
-
-        await query.message.reply_text(
-            "✨ Sistema 100% pronto e operacional!"
-        )
-
-        return
 
     # ========================================================
     # CHECKOUT MERCADO PAGO
