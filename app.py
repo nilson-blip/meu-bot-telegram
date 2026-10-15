@@ -1381,68 +1381,45 @@ async def verificar_grupo_vip_cliente(
     update: Update,
     context
 ):
-
     query = update.callback_query
-
-    await query.answer(
-        "Verificando o seu bot no canal..."
-    )
+    await query.answer("Verificando o seu bot no canal...")
 
     bot_token_cliente = context.user_data.get("bot_token")
     bot_username = context.user_data.get("bot_username", "seu bot")
 
-    
-
     if not bot_token_cliente:
-
         await query.message.reply_text(
             "❌ Erro: Token do seu bot não "
             "foi encontrado. Por favor, "
             "digite /configurar para reiniciar."
         )
-
         return AGUARDANDO_GRUPO_VIP
         
     try:
-        
-        url = f"https://api.telegram.org/bot{bot_token_cliente}/getUpdates"
-        response_json = requests.get(url, timeout=10).json()
-        print("🔍 RESPOSTA GETUPDATES DO TELEGRAM:", response_json)
-        response = response_json
+        # ATIVA O WEBHOOK DO BOT DO CLIENTE DIRETAMENTE NO TELEGRAM
+        webhook_url = (
+            "https://meu-bot-telegram-production-d9c3.up.railway.app/"
+            f"telegram/{bot_token_cliente}"
+        )
 
-
-        chat_id = None
-        chat_title = None
+        async with Bot(token=bot_token_cliente) as client_bot:
+            await client_bot.set_webhook(url=webhook_url)
+            
+            # Vamos buscar os dados do chat através da API do bot ou usar o que temos guardado
+            # (Garante que o bot já foi adicionado ao grupo como admin)
+            chat_id = context.user_data.get("vip_chat_id")
+            chat_title = context.user_data.get("vip_chat_title", "Canal/Grupo VIP")
 
         telegram_user_id = update.effective_user.id
+        client_id = obter_ou_criar_cliente(telegram_user_id)
 
-        if response.get("ok"):
-            for result in reversed(response.get("result", [])):
-                # Tenta apanhar o chat de diferentes tipos de eventos do Telegram
-                chat_info = None
-                if "my_chat_member" in result:
-                    chat_info = result["my_chat_member"]["chat"]
-                elif "message" in result:
-                    chat_info = result["message"]["chat"]
-                elif "channel_post" in result:
-                    chat_info = result["channel_post"]["chat"]
-                elif "edited_message" in result:
-                    chat_info = result["edited_message"]["chat"]
-                    
-                if chat_info:
-                    # Filtramos para garantir que é um Grupo, Supergrupo ou Canal (ignorando chat privado com o bot)
-                    if chat_info.get("type") in ["group", "supergroup", "channel"]:
-                        chat_id = str(chat_info["id"])
-                        chat_title = chat_info.get("title", "Canal/Grupo VIP")
-                        break
+        # Se já tiveres o chat_id guardado do momento da administração:
         if chat_id:
-            client_id = obter_ou_criar_cliente(telegram_user_id)
-
             res = (
                 supabase.table("vip_groups")
                 .upsert({
                     "client_id": client_id,
-                    "chat_id": chat_id,
+                    "chat_id": str(chat_id),
                     "title": chat_title,
                     "created_at": datetime.now(timezone.utc).isoformat()
                 })
@@ -1452,7 +1429,6 @@ async def verificar_grupo_vip_cliente(
             if res.data:
                 context.user_data["vip_group_id"] = res.data[0]["id"]
 
-            # Criamos o link direto para iniciar a configuração automaticamente
             link_bot_cliente = f"https://t.me/{bot_username}?start=configurar"
 
             keyboard = InlineKeyboardMarkup([
@@ -1475,43 +1451,22 @@ async def verificar_grupo_vip_cliente(
             context.user_data.clear()
             return ConversationHandler.END
 
+    except Exception as e:
+        print(f"Erro ao configurar webhook/grupo do cliente: {e}")
 
-        
+    await query.message.reply_text(
+        "⚠️ <b>Ainda não conseguimos detetar o seu bot no canal.</b>\n\n"
+        "Certifique-se de que adicionou o bot como Administrador e enviou uma mensagem.\n"
+        "Depois clique em <b>Tentar Novamente</b>.",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔄 Tentar Novamente", callback_data="verificar_bot_cliente")],
+            [InlineKeyboardButton("❌ Cancelar", callback_data="cancelar_onboarding")]
+        ]),
+        parse_mode="HTML"
+    )
 
+    return AGUARDANDO_GRUPO_VIP
 
-        return await exibir_revisao_final(
-                query.message,
-                context
-            )
-
-        keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton(
-                    "🔄 Tentar Novamente",
-                    callback_data="verificar_bot_cliente"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    "❌ Cancelar",
-                    callback_data="cancelar_onboarding"
-                )
-            ]
-        ])
-
-        await query.message.reply_text(
-            "⚠️ <b>Ainda não conseguimos "
-            "detetar o seu bot no canal.</b>\n\n"
-            "Certifique-se de que adicionou "
-            "o bot como Administrador e "
-            "enviou uma mensagem.\n"
-            "Depois clique em "
-            "<b>Tentar Novamente</b>.",
-            reply_markup=keyboard,
-            parse_mode="HTML"
-        )
-
-        return AGUARDANDO_GRUPO_VIP
 
     except Exception as e:
 
