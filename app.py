@@ -1822,6 +1822,7 @@ async def concluir_configuracao(
 # ============================================================
 
 
+
 async def start(
     update: Update,
     context
@@ -1835,12 +1836,6 @@ async def start(
         keyboard = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton(
-                    "🚀 Iniciar Configuração",
-                    callback_data="iniciar_onboarding"
-                )
-            ],
-            [
-                InlineKeyboardButton(
                     "❌ Cancelar",
                     callback_data="cancelar_onboarding"
                 )
@@ -1848,12 +1843,13 @@ async def start(
         ])
         await update.message.reply_text(
             "👋 <b>Seja muito bem-vindo ao assistente de vendas!</b>\n\n"
-            "Vou ajudar-te a configurar o teu bot em poucos passos para automatizares as vendas do teu canal VIP.\n\n"
-            "Vamos começar? Clica no botão abaixo:",
+            "🏷 <b>Passo 1 de 6: Nome do seu Bot</b>\n\n"
+            "Como você gostaria de chamar o seu bot de vendas?\n"
+            "<i>(Exemplo: VIP Premium Bot, Canal de Sinais Bot)</i>",
             reply_markup=keyboard,
-            parse_mode="HTML",
+            parse_mode="HTML"
         )
-        return
+        return AGUARDANDO_NOME_BOT
 
     await update.message.reply_text(
         "⏳ Carregando planos...",
@@ -1965,8 +1961,6 @@ async def start(
             reply_markup=keyboard,
             parse_mode="HTML"
         )
-
-
 
 
 
