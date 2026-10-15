@@ -3767,7 +3767,7 @@ async def mercadopago_webhook(
             status_code=500
         ) 
     async def cli_iniciar_configuracao(update: Update, context):
-    bot_token_atual = context.bot.token
+        bot_token_atual = context.bot.token
     
     res = (
         supabase.table("telegram_bots")
