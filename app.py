@@ -1428,7 +1428,7 @@ async def verificar_grupo_vip_cliente(
                 elif "edited_message" in result:
                     chat_info = result["edited_message"]["chat"]
                     
-                    if chat_info:
+                if chat_info:
                     # Filtramos para garantir que é um Grupo, Supergrupo ou Canal (ignorando chat privado com o bot)
                     if chat_info.get("type") in ["group", "supergroup", "channel"]:
                         chat_id = str(chat_info["id"])
