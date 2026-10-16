@@ -1374,9 +1374,9 @@ async def exibir_instrucoes_grupo_vip(
             parse_mode="HTML"
         )
 
-    return AGUARDANDO_GRUPO_VIP
-
-
+    return AGUARDANDO_GRUPO_VIP 
+    
+    
 async def verificar_grupo_vip_cliente(
     update: Update,
     context
@@ -1396,7 +1396,6 @@ async def verificar_grupo_vip_cliente(
         return AGUARDANDO_GRUPO_VIP
         
     try:
-        # ATIVA O WEBHOOK DO BOT DO CLIENTE DIRETAMENTE NO TELEGRAM
         webhook_url = (
             "https://meu-bot-telegram-production-d9c3.up.railway.app/"
             f"telegram/{bot_token_cliente}"
@@ -1405,15 +1404,12 @@ async def verificar_grupo_vip_cliente(
         async with Bot(token=bot_token_cliente) as client_bot:
             await client_bot.set_webhook(url=webhook_url)
             
-            # Vamos buscar os dados do chat através da API do bot ou usar o que temos guardado
-            # (Garante que o bot já foi adicionado ao grupo como admin)
             chat_id = context.user_data.get("vip_chat_id")
             chat_title = context.user_data.get("vip_chat_title", "Canal/Grupo VIP")
 
         telegram_user_id = update.effective_user.id
         client_id = obter_ou_criar_cliente(telegram_user_id)
 
-        # Se já tiveres o chat_id guardado do momento da administração:
         if chat_id:
             res = (
                 supabase.table("vip_groups")
@@ -1450,22 +1446,7 @@ async def verificar_grupo_vip_cliente(
             )
             context.user_data.clear()
             return ConversationHandler.END
-    
-    except Exception as e:
-        print(f"Erro ao configurar webhook/grupo do cliente: {e}")
-        
-        await query.message.reply_text(
-                "✅ <b>Grupo/Canal VIP vinculado com sucesso!</b>\n\n"
-                f"📢 <b>Grupo:</b> {html.escape(chat_title)}\n\n"
-                f"✨ O seu bot <b>@{html.escape(bot_username)}</b> está pronto!\n\n"
-                "👉 Clique no botão abaixo para abrir o seu bot e cadastrar os seus produtos e valores:",
-                reply_markup=keyboard,
-                parse_mode="HTML"
-            )
-        context.user_data.clear()
-        return ConversationHandler.END
 
-        # Caso o chat_id não seja encontrado dentro do try
         keyboard = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton(
@@ -1494,6 +1475,17 @@ async def verificar_grupo_vip_cliente(
         )
 
         return AGUARDANDO_GRUPO_VIP
+    
+    except Exception as e:
+        print(f"Erro ao verificar/configurar bot do cliente: {e}")
+        
+        await query.message.reply_text(
+            "❌ Ocorreu um erro ao verificar "
+            "o bot. Tente novamente."
+        )
+
+        return AGUARDANDO_GRUPO_VIP
+
 
     except Exception as e:
 
